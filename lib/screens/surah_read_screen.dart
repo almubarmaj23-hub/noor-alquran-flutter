@@ -2003,6 +2003,28 @@ class _IrabTabState extends State<_IrabTab> with AutomaticKeepAliveClientMixin {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 32),
                   children: [
+                    // Color legend for word types
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2A3A46) : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.purple.withValues(alpha: 0.1)),
+                      ),
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _buildLegendChip('اسم', const Color(0xFF37474F)),
+                          _buildLegendChip('فعل', const Color(0xFF1565C0)),
+                          _buildLegendChip('حرف', const Color(0xFF6A1B9A)),
+                          _buildLegendChip('ضمير', const Color(0xFF00695C)),
+                          _buildLegendChip('ظرف', const Color(0xFFE65100)),
+                        ],
+                      ),
+                    ),
                     // Ayah text display
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -2054,6 +2076,23 @@ class _IrabTabState extends State<_IrabTab> with AutomaticKeepAliveClientMixin {
                   ],
                 ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildLegendChip(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10, height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
       ],
     );
   }
