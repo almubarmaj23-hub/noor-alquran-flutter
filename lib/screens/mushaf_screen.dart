@@ -194,10 +194,17 @@ class _MushafScreenState extends State<MushafScreen>
               IconButton(
                 icon: const Icon(Icons.search, color: Colors.white),
                 onPressed: () => _showSearch(context),
+                tooltip: 'البحث في القرآن',
+              ),
+              IconButton(
+                icon: const Icon(Icons.format_list_numbered, color: Colors.white),
+                onPressed: () => _showGoToSurah(context),
+                tooltip: 'الانتقال لسورة',
               ),
               IconButton(
                 icon: const Icon(Icons.menu_book, color: Colors.white),
                 onPressed: () => _showTableOfContents(context),
+                tooltip: 'فهرس المصحف',
               ),
             ],
           ),
@@ -231,9 +238,19 @@ class _MushafScreenState extends State<MushafScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'صفحة $_currentPage من $totalPages',
-                      style: TextStyle(color: _gold, fontSize: 13, fontWeight: FontWeight.bold),
+                    GestureDetector(
+                      onTap: () => _showGoToPage(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: _gold.withValues(alpha: 0.5)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'صفحة $_currentPage من $totalPages',
+                          style: TextStyle(color: _gold, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     SliderTheme(
@@ -266,31 +283,90 @@ class _MushafScreenState extends State<MushafScreen>
   }
 
   Map<String, dynamic> _getMushafPageInfo(int page) {
-    // Approximate surah info per page range
-    final juz = ((page - 1) / 20.133).floor() + 1;
-    final surahName = _getSurahForPage(page);
-    return {'surah': surahName, 'juz': juz.clamp(1, 30)};
+    final juz = _getJuzForPage(page);
+    final surahEntry = _getSurahEntryForPage(page);
+    return {
+      'surah': surahEntry != null ? 'سورة ${surahEntry.name}' : 'القرآن الكريم',
+      'juz': juz,
+    };
   }
 
-  String _getSurahForPage(int page) {
-    if (page <= 2) return 'سورة الفاتحة';
-    if (page <= 49) return 'سورة البقرة';
-    if (page <= 76) return 'سورة آل عمران';
-    if (page <= 106) return 'سورة النساء';
-    if (page <= 127) return 'سورة المائدة';
-    if (page <= 149) return 'سورة الأنعام';
-    if (page <= 176) return 'سورة الأعراف';
-    if (page <= 203) return 'سورة التوبة';
-    if (page <= 235) return 'سورة يوسف';
-    if (page <= 282) return 'سورة الكهف';
-    if (page <= 312) return 'سورة الشعراء';
-    if (page <= 341) return 'سورة الأحزاب';
-    if (page <= 404) return 'سورة الزمر';
-    if (page <= 434) return 'سورة الحجرات';
-    if (page <= 481) return 'سورة الملك';
-    if (page <= 534) return 'سورة المزمل';
-    if (page <= 604) return 'سورة النبأ';
-    return 'القرآن الكريم';
+  int _getJuzForPage(int page) {
+    // Accurate juz starts by page (Medina Mushaf)
+    const juzPages = [
+      1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
+      201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
+      402, 422, 442, 462, 482, 502, 522, 542, 562, 582
+    ];
+    int juz = 1;
+    for (int i = juzPages.length - 1; i >= 0; i--) {
+      if (page >= juzPages[i]) {
+        juz = i + 1;
+        break;
+      }
+    }
+    return juz.clamp(1, 30);
+  }
+
+  _SurahIndexEntry? _getSurahEntryForPage(int page) {
+    _SurahIndexEntry? result;
+    for (final entry in _mushafSurahIndex) {
+      if (entry.startPage <= page) {
+        result = entry;
+      } else {
+        break;
+      }
+    }
+    return result;
+  }
+
+  void _showGoToPage(BuildContext context) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('الانتقال إلى صفحة', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('أدخل رقم الصفحة (1-$totalPages)', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: '$_currentPage',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: _gold, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.white),
+              onPressed: () {
+                final page = int.tryParse(ctrl.text);
+                if (page != null && page >= 1 && page <= totalPages) {
+                  Navigator.pop(ctx);
+                  _goToPage(page);
+                }
+              },
+              child: const Text('انتقال'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSearch(BuildContext context) {
@@ -308,6 +384,15 @@ class _MushafScreenState extends State<MushafScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _TableOfContentsSheet(onNavigate: _goToPage),
+    );
+  }
+
+  void _showGoToSurah(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _GoToSurahSheet(onNavigate: _goToPage),
     );
   }
 }
@@ -1161,9 +1246,24 @@ class _TableOfContentsSheetState extends State<_TableOfContentsSheet>
   }
 
   Widget _buildJuzList(bool isDark) {
+    // Accurate juz start pages in the Medina Mushaf
+    const juzStartPages = [
+      1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
+      201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
+      402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
+    ];
+    const juzStartSurah = [
+      'الفاتحة', 'البقرة', 'البقرة', 'آل عمران', 'النساء',
+      'النساء', 'المائدة', 'الأنعام', 'الأعراف', 'الأنفال',
+      'التوبة', 'هود', 'يوسف', 'إبراهيم', 'الإسراء',
+      'الكهف', 'الأنبياء', 'المؤمنون', 'الفرقان', 'النمل',
+      'العنكبوت', 'الأحزاب', 'يس', 'الزمر', 'فصلت',
+      'الأحقاف', 'الذاريات', 'المجادلة', 'الملك', 'النبأ',
+    ];
     final juzData = List.generate(30, (i) => _JuzEntry(
       number: i + 1,
-      startPage: (i * 20.133 + 1).round(),
+      startPage: juzStartPages[i],
+      startSurah: juzStartSurah[i],
     ));
 
     final filtered = juzData.where((j) =>
@@ -1206,28 +1306,268 @@ class _TableOfContentsSheetState extends State<_TableOfContentsSheet>
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'الجزء ${juz.number}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'الجزء ${juz.number}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      if (juz.startSurah.isNotEmpty)
+                        Text(
+                          'يبدأ من سورة ${juz.startSurah}',
+                          style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                        ),
+                    ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _gold.withValues(alpha: 0.1),
+                    gradient: const LinearGradient(colors: [Color(0xFFD4A843), Color(0xFFE8B45A)]),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text('ص${juz.startPage}', style: TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: Text('ص${juz.startPage}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ========== GO TO SURAH SHEET ==========
+class _GoToSurahSheet extends StatefulWidget {
+  final Function(int) onNavigate;
+  const _GoToSurahSheet({required this.onNavigate});
+
+  @override
+  State<_GoToSurahSheet> createState() => _GoToSurahSheetState();
+}
+
+class _GoToSurahSheetState extends State<_GoToSurahSheet> {
+  final _searchCtrl = TextEditingController();
+  String _filter = '';
+
+  static const Color _gold = Color(0xFFD4A843);
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final filtered = _mushafSurahIndex.where((s) =>
+      s.name.contains(_filter) ||
+      s.nameEn.toLowerCase().contains(_filter.toLowerCase()) ||
+      s.number.toString() == _filter
+    ).toList();
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.88,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1209) : const Color(0xFFFDF6E3),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: _gold.withValues(alpha: 0.4), width: 2)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(top: 12),
+                decoration: BoxDecoration(
+                  color: _gold.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFD4A843), Color(0xFFE8B45A)]),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.format_list_numbered, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'الانتقال إلى سورة',
+                        style: TextStyle(
+                          color: _gold,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '١١٤ سورة في القرآن الكريم',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Search
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _filter = v),
+                textDirection: TextDirection.rtl,
+                decoration: InputDecoration(
+                  hintText: 'ابحث باسم السورة أو رقمها...',
+                  hintTextDirection: TextDirection.rtl,
+                  prefixIcon: Icon(Icons.search, color: _gold.withValues(alpha: 0.7), size: 20),
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : _gold.withValues(alpha: 0.06),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: _gold, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+            // List
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final surah = filtered[index];
+                  return _buildSurahItem(surah, isDark);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSurahItem(_SurahIndexEntry surah, bool isDark) {
+    final isMakki = surah.type == 'مكية';
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        widget.onNavigate(surah.startPage);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _gold.withValues(alpha: 0.15)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              // Surah number in decorated circle
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: isMakki
+                        ? [const Color(0xFF6D4C41), const Color(0xFFD4A843)]
+                        : [const Color(0xFF1B5E20), const Color(0xFF4CAF50)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: _gold.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    '${surah.number}',
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Surah name
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      surah.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isDark ? const Color(0xFFEDE0C8) : const Color(0xFF3E2723),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          surah.nameEn,
+                          style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isMakki
+                                ? const Color(0xFF6D4C41).withValues(alpha: 0.15)
+                                : const Color(0xFF1B5E20).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            surah.type,
+                            style: TextStyle(
+                              color: isMakki ? const Color(0xFF6D4C41) : const Color(0xFF2E7D32),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Page badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFFD4A843), Color(0xFFE8B45A)]),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'ص${surah.startPage}',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1300,7 +1640,8 @@ class _SurahIndexEntry {
 class _JuzEntry {
   final int number;
   final int startPage;
-  _JuzEntry({required this.number, required this.startPage});
+  final String startSurah;
+  _JuzEntry({required this.number, required this.startPage, this.startSurah = ''});
 }
 
 const List<_SurahIndexEntry> _mushafSurahIndex = [

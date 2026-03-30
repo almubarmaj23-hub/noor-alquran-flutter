@@ -1203,52 +1203,104 @@ class _IrabTabState extends State<_IrabTab> with AutomaticKeepAliveClientMixin {
   }
 
   bool _isVerb(String w) {
-    if (w.length < 2) return false;
-    // Past tense patterns
-    if (w.endsWith('وا') || w.endsWith('تم') || w.endsWith('نا') || w.endsWith('تن')) return true;
-    // Prefixes indicating present tense
-    if ((w.startsWith('ي') || w.startsWith('ت') || w.startsWith('ن') || w.startsWith('أ')) && w.length > 3) return true;
-    // Imperative
-    if (w.startsWith('ا') && w.length > 3) return true;
+    if (w.length < 2) { return false; }
+    // Past tense patterns (including attached pronouns)
+    if (w.endsWith('وا') || w.endsWith('تم') || w.endsWith('نا') || w.endsWith('تن') ||
+        w.endsWith('تما') || w.endsWith('تموا') || (w.endsWith('ت') && w.length > 3)) { return true; }
+    // Present tense prefixes: ي، ت، ن، أ with min length
+    if ((w.startsWith('ي') || w.startsWith('ت') || w.startsWith('ن') || w.startsWith('أ')) && w.length > 3) { return true; }
+    // Imperative: starts with ا (alef wasl)
+    if (w.startsWith('ا') && w.length > 3 && !w.startsWith('ال')) { return true; }
+    // Common Quran verb roots to help detection
+    const verbRoots = ['قَالَ', 'قال', 'كان', 'جاء', 'رأى', 'أَمَرَ', 'نزل', 'خلق', 'علم', 'أعلم',
+      'آمن', 'كفر', 'عبد', 'شكر', 'ذكر', 'دخل', 'خرج', 'أرسل', 'أنزل', 'هدى', 'ضل',
+      'فعل', 'قدر', 'وعد', 'وعظ', 'أمر', 'نهى', 'حكم', 'عدل', 'ظلم'];
+    if (verbRoots.contains(w)) return true;
     return false;
   }
 
+  /// تحليل متقدم للفعل - يأخذ في الاعتبار الحركات والضمائر المتصلة
   Map<String, String> _analyzeVerb(String clean, String full, int pos) {
-    String tense, form, sign, note = '';
+    String tense, form, sign, note = '', subject = '';
 
-    if (clean.endsWith('وا') || clean.endsWith('تم') || clean.endsWith('نا') || clean.endsWith('ت')) {
+    // ---- تحديد نوع الفعل ----
+    if (clean.endsWith('وا')) {
       tense = 'ماضٍ';
-      if (clean.endsWith('وا')) {
-        form = 'مبني على الضم لاتصاله بواو الجماعة';
-        sign = 'الضمة';
-      } else if (clean.endsWith('تم')) {
-        form = 'مبني على السكون لاتصاله بتاء الفاعل المتحركة';
-        sign = 'السكون';
-      } else if (clean.endsWith('نا')) {
-        form = 'مبني على السكون لاتصاله بنا الفاعلين';
-        sign = 'السكون';
-      } else {
-        form = 'مبني على السكون لاتصاله بتاء التأنيث الساكنة';
-        sign = 'السكون';
-      }
-    } else if (clean.startsWith('ا') && clean.length > 3) {
-      tense = 'أمر';
+      form = 'مبني على الضم';
+      sign = 'الضمة المقدرة قبل واو الجماعة';
+      subject = 'واو الجماعة: فاعل مبني على السكون في محل رفع';
+    } else if (clean.endsWith('تموا') || clean.endsWith('تم')) {
+      tense = 'ماضٍ';
       form = 'مبني على السكون';
       sign = 'السكون';
-      note = 'فعل الأمر مبني دائماً';
-    } else {
-      tense = 'مضارع';
-      // Determine the mood from diacritics
-      if (full.endsWith('\u064E') || full.endsWith('\u064F')) {
-        form = 'مرفوع بالضمة الظاهرة على آخره';
-        sign = 'الضمة';
-        note = 'الفعل المضارع مرفوع إذا لم يسبقه ناصب أو جازم';
-      } else if (full.endsWith('\u064E\u0646') || full.endsWith('\u064F\u0646')) {
-        form = 'مرفوع وعلامة رفعه ثبوت النون لأنه من الأفعال الخمسة';
-        sign = 'ثبوت النون';
-        note = 'الأفعال الخمسة ترفع بثبوت النون';
+      subject = 'ضمير المخاطبين: فاعل مبني في محل رفع';
+    } else if (clean.endsWith('نا')) {
+      tense = 'ماضٍ';
+      form = 'مبني على السكون';
+      sign = 'السكون';
+      subject = '"نا": ضمير المتكلمين، فاعل مبني في محل رفع';
+    } else if (clean.endsWith('تما')) {
+      tense = 'ماضٍ';
+      form = 'مبني على السكون';
+      sign = 'السكون';
+      subject = 'ضمير المثنى: فاعل مبني في محل رفع';
+    } else if (clean.endsWith('ت') && clean.length > 3) {
+      tense = 'ماضٍ';
+      form = 'مبني على الفتح';
+      sign = 'الفتح الظاهر';
+      // تحقق هل هو تاء التأنيث أم تاء الفاعل
+      final lastChar = full.length > 1 ? full[full.length - 2] : '';
+      if (lastChar == '\u064E') { // فتحة قبل التاء = تاء الفاعل
+        subject = 'تاء الفاعل: ضمير رفع متحرك في محل رفع فاعل';
       } else {
-        form = 'مرفوع بالضمة الظاهرة أو المقدرة';
+        form = 'مبني على السكون';
+        sign = 'السكون';
+        subject = 'تاء التأنيث الساكنة: حرف مبني لا محل له من الإعراب';
+      }
+    } else if (clean.startsWith('ا') && !clean.startsWith('ال') && clean.length > 3) {
+      tense = 'أمر';
+      // تحقق من نوع البناء
+      if (clean.endsWith('وا')) {
+        form = 'مبني على حذف النون';
+        sign = 'حذف النون';
+        subject = 'واو الجماعة: فاعل مبني في محل رفع';
+      } else if (clean.endsWith('ي') || clean.endsWith('ن')) {
+        form = 'مبني على حذف النون';
+        sign = 'حذف النون';
+      } else {
+        form = 'مبني على السكون';
+        sign = 'السكون الظاهر على آخره';
+      }
+      note = 'فعل الأمر مبني دائماً ولا يدخله التغيير الإعرابي';
+    } else {
+      // ---- الفعل المضارع - تحليل دقيق بالحركات ----
+      tense = 'مضارع';
+      final lastChar = full.isNotEmpty ? full[full.length - 1] : '';
+      final secondLast = full.length > 1 ? full[full.length - 2] : '';
+
+      if (lastChar == '\u0646' && (secondLast == '\u064F' || secondLast == '\u064E')) {
+        // ثبوت النون - الأفعال الخمسة
+        form = 'مرفوع وعلامة رفعه ثبوت النون (من الأفعال الخمسة)';
+        sign = 'ثبوت النون';
+        note = 'الأفعال الخمسة: تُرفع بثبوت النون وتُنصب وتُجزم بحذفها';
+      } else if (lastChar == '\u064F') {
+        form = 'مرفوع وعلامة رفعه الضمة الظاهرة على آخره';
+        sign = 'الضمة الظاهرة';
+        note = 'الفعل المضارع مرفوع لتجرده من الناصب والجازم';
+      } else if (lastChar == '\u064E') {
+        form = 'منصوب وعلامة نصبه الفتحة الظاهرة';
+        sign = 'الفتحة الظاهرة';
+        note = 'يكون الفعل المضارع منصوباً بعد: أن، لن، كي، حتى، وغيرها';
+      } else if (lastChar == '\u0652') {
+        form = 'مجزوم وعلامة جزمه السكون';
+        sign = 'السكون';
+        note = 'يُجزم الفعل المضارع بعد أدوات الجزم: لم، لا الناهية، وجواب الطلب';
+      } else if (clean.endsWith('ي') || clean.endsWith('ا') || clean.endsWith('و')) {
+        form = 'مرفوع وعلامة رفعه الضمة المقدرة على حرف العلة';
+        sign = 'الضمة المقدرة';
+        note = 'تُقدَّر الحركة على حروف العلة للثقل';
+      } else {
+        form = 'مرفوع وعلامة رفعه الضمة الظاهرة أو المقدرة';
         sign = 'الضمة';
       }
     }
@@ -1257,48 +1309,123 @@ class _IrabTabState extends State<_IrabTab> with AutomaticKeepAliveClientMixin {
       'type': 'فعل',
       'category': 'فعل $tense',
       'irab': 'فعل $tense $form',
-      'build': 'علامة إعرابه: $sign',
+      'build': 'علامة إعرابه: $sign${subject.isNotEmpty ? " | $subject" : ""}',
       if (note.isNotEmpty) 'note': note,
     };
   }
 
+  /// تحليل متقدم للأسماء - يأخذ في الاعتبار الجمع والتثنية وأنواع الاسم
   Map<String, String> _analyzeNoun(String clean, String full, int pos, int total) {
-    final isDefinite = clean.startsWith('ال') || clean.startsWith('لل');
+    // تحقق من علامات التعريف
+    final isDefiniteAl = clean.startsWith('ال') || clean.startsWith('لل');
+
+    // تحقق من التنوين والحركات
     final isTanwin = full.contains('\u064C') || full.contains('\u064B') || full.contains('\u064D');
-    final isMajroor = full.endsWith('\u0650') || full.endsWith('\u0650\u0646');
-    final isMansub = full.endsWith('\u064E') || full.endsWith('\u064E\u0646');
-    final isMarfu = full.endsWith('\u064F') || full.endsWith('\u064F\u0646');
 
-    String position, sign, note = '';
+    // تحقق من علامات الإعراب على الحرف الأخير (نتجاهل isProper مؤقتاً - قيمة مساعدة)
+    final lastChar = full.isNotEmpty ? full[full.length - 1] : '';
+    final secondLast = full.length > 1 ? full[full.length - 2] : '';
 
-    if (pos == 0) {
-      position = 'مرفوع (مبتدأ أو فاعل)';
-      sign = isTanwin ? 'الضمة المنونة' : 'الضمة الظاهرة';
-      note = 'الاسم في أول الجملة الاسمية يكون مبتدأ مرفوعاً';
-    } else if (isMajroor) {
-      position = 'مجرور';
-      sign = isDefinite ? 'الكسرة الظاهرة' : (isTanwin ? 'الكسرة المنونة' : 'الكسرة');
-      note = 'الجر يكون بعد حرف الجر أو بالإضافة';
-    } else if (isMansub) {
-      position = 'منصوب';
-      sign = isDefinite ? 'الفتحة الظاهرة' : (isTanwin ? 'الفتحة المنونة' : 'الفتحة');
-    } else if (isMarfu) {
-      position = 'مرفوع';
-      sign = isDefinite ? 'الضمة الظاهرة' : (isTanwin ? 'الضمة المنونة' : 'الضمة');
+    final isMajroor = lastChar == '\u0650' ||
+        (lastChar == '\u0646' && secondLast == '\u0650') || // كسرة + نون
+        full.endsWith('\u064D'); // تنوين كسر
+
+    final isMansub = lastChar == '\u064E' ||
+        (lastChar == '\u0646' && secondLast == '\u064E') || // فتحة + نون
+        full.endsWith('\u064B'); // تنوين فتح
+
+    final isMarfu = lastChar == '\u064F' ||
+        (lastChar == '\u0646' && secondLast == '\u064F') || // ضمة + نون
+        full.endsWith('\u064C'); // تنوين ضم
+
+    // تحقق من الجمع والتثنية
+    final isDual = clean.endsWith('ان') || clean.endsWith('ين') && clean.length > 4;
+    final isMascPlural = clean.endsWith('ون') || clean.endsWith('ين') && !isDual;
+    final isFemsPlural = clean.endsWith('ات') && clean.length > 3;
+
+    String position, sign, note = '', definiteness = '';
+
+    // تحديد التعريف
+    if (isDefiniteAl) {
+      definiteness = 'معرفة بـ(ال) التعريف';
+    } else if (isTanwin) {
+      definiteness = 'نكرة منونة';
     } else {
-      position = pos <= 1 ? 'مرفوع' : 'يحدد محله حسب السياق';
-      sign = 'علامة إعرابه حسب موضعه';
+      definiteness = 'اسم معرفة بالإضافة أو العلمية';
     }
 
-    final definiteness = isDefinite ? 'معرفة بأل التعريف' : (isTanwin ? 'نكرة منونة' : 'معرفة');
+    // تحديد الموضع الإعرابي
+    if (isMajroor) {
+      position = 'مجرور';
+      if (isDual) {
+        sign = 'الياء نيابةً عن الكسرة (مثنى)';
+        note = 'المثنى: يُرفع بالألف ويُجر وينصب بالياء';
+      } else if (isMascPlural) {
+        sign = 'الياء نيابةً عن الكسرة (جمع مذكر سالم)';
+        note = 'جمع المذكر السالم: يُرفع بالواو ويُجر وينصب بالياء';
+      } else {
+        sign = isDefiniteAl ? 'الكسرة الظاهرة على آخره' : (isTanwin ? 'الكسرة المنونة' : 'الكسرة');
+      }
+      note = note.isEmpty ? 'يأتي مجروراً بعد حرف الجر أو بالإضافة' : note;
+    } else if (isMansub) {
+      position = 'منصوب';
+      if (isDual) {
+        sign = 'الياء نيابةً عن الفتحة (مثنى)';
+      } else if (isMascPlural) {
+        sign = 'الياء نيابةً عن الفتحة (جمع مذكر سالم)';
+      } else if (isFemsPlural) {
+        sign = 'الكسرة نيابةً عن الفتحة (جمع مؤنث سالم)';
+        note = 'جمع المؤنث السالم يُنصب بالكسرة نيابةً عن الفتحة';
+      } else {
+        sign = isDefiniteAl ? 'الفتحة الظاهرة على آخره' : (isTanwin ? 'الفتحة المنونة' : 'الفتحة');
+      }
+    } else if (isMarfu) {
+      position = 'مرفوع';
+      if (isDual) {
+        sign = 'الألف نيابةً عن الضمة (مثنى)';
+      } else if (isMascPlural) {
+        sign = 'الواو نيابةً عن الضمة (جمع مذكر سالم)';
+      } else {
+        sign = isDefiniteAl ? 'الضمة الظاهرة على آخره' : (isTanwin ? 'الضمة المنونة' : 'الضمة');
+      }
+    } else if (pos == 0) {
+      position = 'مرفوع (محتملاً مبتدأ أو فاعلاً)';
+      sign = 'الضمة الظاهرة أو المقدرة';
+      note = 'الاسم المبتدئ به الجملة يُرفع مبتدأً أو فاعلاً';
+    } else if (clean.endsWith('ي') || clean.endsWith('ا') || clean.endsWith('و')) {
+      position = 'يُحدَّد من السياق (حرف علة في آخره)';
+      sign = 'الحركة مقدرة على حرف العلة';
+      note = 'الاسم المقصور والممدود تُقدَّر فيهما الحركات';
+    } else {
+      position = 'يُحدَّد من السياق';
+      sign = 'حسب موضعه في الجملة';
+    }
+
+    // تحقق من الممنوع من الصرف
+    final noSarf = _isMamnuMinAlSarf(clean);
+    if (noSarf) {
+      definiteness += ' (ممنوع من الصرف)';
+      note = note.isEmpty ? 'ممنوع من الصرف: يُجر بالفتحة بدل الكسرة' : '$note | ممنوع من الصرف';
+    }
 
     return {
       'type': 'اسم',
       'category': 'اسم $definiteness',
       'irab': 'اسم $position، وعلامة إعرابه $sign',
-      'build': 'معرب، علامة إعرابه $sign',
+      'build': 'معرب، علامة إعرابه $sign${isDual ? " (مثنى)" : isMascPlural ? " (جمع مذكر سالم)" : isFemsPlural ? " (جمع مؤنث سالم)" : ""}',
       if (note.isNotEmpty) 'note': note,
     };
+  }
+
+  /// تحقق من الممنوع من الصرف بناءً على الأوزان الشائعة
+  bool _isMamnuMinAlSarf(String w) {
+    if (w.startsWith('ال')) return false; // المعرف بأل ليس ممنوعاً
+    // أسماء أعلام شائعة ممنوعة من الصرف
+    const mamnuNames = ['إبراهيم', 'إسماعيل', 'إسحاق', 'يعقوب', 'يوسف', 'موسى', 'عيسى',
+      'مريم', 'فرعون', 'هامان', 'قارون', 'لقمان', 'نوح', 'هود', 'صالح'];
+    if (mamnuNames.contains(w)) return true;
+    // التنوين غير موجود في الممنوع من الصرف عادةً
+    return false;
   }
 
   void _shareIrab(int ayahNum) {
