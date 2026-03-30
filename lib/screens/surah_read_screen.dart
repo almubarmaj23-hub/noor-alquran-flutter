@@ -589,12 +589,297 @@ class _SurahReadScreenState extends State<SurahReadScreen>
         ));
         break;
       case 'tafsir':
-        _tabController.animateTo(1);
+        // Show quick tafsir bottom sheet for this specific ayah
+        _showQuickTafsir(ayah);
         break;
       case 'irab':
         _tabController.animateTo(2);
         break;
     }
+  }
+
+  void _showQuickTafsir(Ayah ayah) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _QuickTafsirSheet(
+        surah: widget.surah,
+        ayah: ayah,
+      ),
+    );
+  }
+}
+
+/// =========== QUICK TAFSIR SHEET ===========
+/// يعرض تفسير آية محددة في bottom sheet مع اختيار كتاب التفسير
+class _QuickTafsirSheet extends StatefulWidget {
+  final Surah surah;
+  final Ayah ayah;
+
+  const _QuickTafsirSheet({required this.surah, required this.ayah});
+
+  @override
+  State<_QuickTafsirSheet> createState() => _QuickTafsirSheetState();
+}
+
+class _QuickTafsirSheetState extends State<_QuickTafsirSheet> {
+  String _selectedEdition = 'ar-tafsir-ibn-kathir';
+  String? _tafsirText;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTafsir();
+  }
+
+  Future<void> _fetchTafsir() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final text = await QuranService.fetchAyahTafsir(
+        _selectedEdition,
+        widget.surah.id,
+        widget.ayah.numberInSurah,
+      );
+      if (mounted) {
+        setState(() {
+          _tafsirText = text ?? 'لا يتوفر تفسير لهذه الآية في هذا الكتاب حالياً.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'فشل تحميل التفسير. تحقق من الاتصال بالإنترنت.';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  TafsirEdition get _currentEdition =>
+      QuranService.tafsirEditions.firstWhere((e) => e.id == _selectedEdition);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final edition = _currentEdition;
+    final editionColor = Color(edition.color);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.88,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C2A36) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(top: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Header with ayah info
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [editionColor.withValues(alpha: 0.15), editionColor.withValues(alpha: 0.05)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: editionColor.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Title row
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: editionColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.auto_stories, color: editionColor, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'تفسير الآية ${widget.ayah.numberInSurah} من سورة ${widget.surah.nameArabic}',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: editionColor),
+                            ),
+                            Text(edition.name, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      // Share button
+                      if (_tafsirText != null)
+                        IconButton(
+                          onPressed: () {
+                            final text = '📖 ${edition.name}\n\n'
+                                'سورة ${widget.surah.nameArabic} - الآية ${widget.ayah.numberInSurah}\n\n'
+                                '﴿ ${widget.ayah.text} ﴾\n\n$_tafsirText\n\n— من تطبيق نور القرآن';
+                            SharePlus.instance.share(ShareParams(text: text));
+                          },
+                          icon: const Icon(Icons.share_rounded, size: 20),
+                          color: editionColor,
+                          tooltip: 'مشاركة التفسير',
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Ayah text
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      widget.ayah.text,
+                      textAlign: TextAlign.justify,
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(fontSize: 18, height: 2.1, fontWeight: FontWeight.w400),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Edition Selector (horizontal)
+            Container(
+              height: 48,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: QuranService.tafsirEditions.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final ed = QuranService.tafsirEditions[index];
+                  final isSelected = ed.id == _selectedEdition;
+                  final edColor = Color(ed.color);
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() => _selectedEdition = ed.id);
+                      _fetchTafsir();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? edColor : edColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: edColor.withValues(alpha: isSelected ? 1 : 0.3)),
+                      ),
+                      child: Text(
+                        ed.name,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : edColor,
+                          fontSize: 11,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Tafsir content
+            Expanded(
+              child: _isLoading
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: editionColor, strokeWidth: 2),
+                          const SizedBox(height: 12),
+                          Text('جاري تحميل التفسير...', style: TextStyle(color: Colors.grey[500])),
+                        ],
+                      ),
+                    )
+                  : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.wifi_off, size: 48, color: Colors.grey[400]),
+                              const SizedBox(height: 12),
+                              Text(_error!, style: const TextStyle(color: Colors.grey)),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: _fetchTafsir,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('إعادة المحاولة'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: editionColor.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.format_quote_rounded, color: editionColor.withValues(alpha: 0.4), size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      edition.author,
+                                      style: TextStyle(
+                                        color: editionColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                SelectableText(
+                                  _tafsirText ?? '',
+                                  textDirection: TextDirection.rtl,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    height: 2.0,
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.88)
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
