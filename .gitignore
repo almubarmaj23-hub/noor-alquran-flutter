@@ -1,0 +1,25 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub/
+build/
+*.iml
+*.log
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+android/release-key.jks
+**/GeneratedPluginRegistrant.java
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
+
+# Web
+build/web/
