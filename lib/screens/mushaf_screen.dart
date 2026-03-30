@@ -54,7 +54,59 @@ class _MushafScreenState extends State<MushafScreen>
 
   Future<void> _loadBookmark() async {
     final lastPage = await BookmarkService.getLastPage();
-    if (mounted) setState(() => _bookmarkedPage = lastPage);
+    if (mounted) {
+      setState(() => _bookmarkedPage = lastPage);
+      // Show resume dialog if bookmark is on a different page and user didn't specify initial page
+      if (widget.initialPage == 1 && lastPage > 1 && lastPage != _currentPage) {
+        _showResumeDialog(lastPage);
+      }
+    }
+  }
+
+  void _showResumeDialog(int savedPage) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _gold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.bookmark_rounded, color: _gold, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('متابعة القراءة', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          content: Text(
+            'لديك علامة مرجعية عند الصفحة $savedPage.\nهل تريد المتابعة من حيث توقفت؟',
+            style: const TextStyle(fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('البداية'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _gold),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _goToPage(savedPage);
+              },
+              child: Text('انتقل لصفحة $savedPage'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _toggleBookmark() {
