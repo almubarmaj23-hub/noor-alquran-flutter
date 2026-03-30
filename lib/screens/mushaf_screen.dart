@@ -230,6 +230,27 @@ class _MushafScreenState extends State<MushafScreen>
                 onPressed: _toggleBookmark,
                 tooltip: 'حفظ علامة مرجعية',
               ),
+              if (_bookmarkedPage > 0 && _bookmarkedPage != _currentPage)
+                GestureDetector(
+                  onTap: () => _goToPage(_bookmarkedPage),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    margin: const EdgeInsets.only(left: 4),
+                    decoration: BoxDecoration(
+                      color: _gold.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _gold.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bookmark, color: _gold, size: 14),
+                        const SizedBox(width: 2),
+                        Text('ص$_bookmarkedPage', style: TextStyle(color: _gold, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
               IconButton(
                 icon: const Icon(Icons.search, color: Colors.white),
                 onPressed: () => _showSearch(context),
