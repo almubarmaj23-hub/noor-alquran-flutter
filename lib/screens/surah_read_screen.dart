@@ -331,7 +331,23 @@ class _SurahReadScreenState extends State<SurahReadScreen>
   }
 
   Widget _buildReadingTab(ThemeData theme, bool isDark) {
-    return ListView(
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        // Save reading position periodically based on scroll
+        if (notification is ScrollUpdateNotification && _ayahs.isNotEmpty) {
+          final offset = _readingScrollController.offset;
+          final cardHeight = 140.0;
+          final visibleAyahIndex = (offset / cardHeight).floor().clamp(0, _ayahs.length - 1);
+          final visibleAyah = _ayahs[visibleAyahIndex];
+          BookmarkService.saveLastReading(
+            widget.surah.id,
+            visibleAyah.numberInSurah,
+            widget.surah.nameArabic,
+          );
+        }
+        return false;
+      },
+      child: ListView(
       controller: _readingScrollController,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
@@ -364,6 +380,7 @@ class _SurahReadScreenState extends State<SurahReadScreen>
           ),
         ..._ayahs.map((ayah) => _buildAyahCard(ayah, theme, isDark)),
       ],
+    ),
     );
   }
 
