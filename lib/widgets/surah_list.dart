@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/audio_provider.dart';
 import '../models/surah.dart';
+import '../screens/surah_read_screen.dart';
 
 class SurahListWidget extends StatelessWidget {
   const SurahListWidget({super.key});
@@ -44,7 +45,7 @@ class SurahListWidget extends StatelessWidget {
         crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 0.85,
+        childAspectRatio: 0.72,
       ),
       delegate: SliverChildBuilderDelegate(
         (context, index) => _SurahCard(surah: list[index]),
@@ -177,12 +178,41 @@ class _SurahCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
+            // Read + Tafsir button
+            SizedBox(
+              height: 34,
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SurahReadScreen(surah: surah),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.auto_stories, size: 14),
+                label: Text(
+                  isAr ? 'قراءة وتفسير' : 'Read & Tafsir',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF1B5E20),
+                  side: const BorderSide(
+                      color: Color(0xFF1B5E20), width: 1),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
             // Buttons
             Row(
               children: [
                 Expanded(
                   child: SizedBox(
-                    height: 38,
+                    height: 36,
                     child: FilledButton(
                       onPressed: () => provider.playSurah(surah),
                       style: FilledButton.styleFrom(
@@ -208,8 +238,8 @@ class _SurahCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 SizedBox(
-                  width: 38,
-                  height: 38,
+                  width: 36,
+                  height: 36,
                   child: OutlinedButton(
                     onPressed: () => provider.toggleFavorite(surah.id),
                     style: OutlinedButton.styleFrom(
