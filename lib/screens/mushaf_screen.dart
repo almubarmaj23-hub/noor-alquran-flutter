@@ -17,7 +17,7 @@ class _MushafScreenState extends State<MushafScreen>
   late PageController _pageController;
   int _currentPage = 1;
   bool _showOverlay = false;
-  bool _isLoading = false;
+
 
   // Cache for page data
   final Map<int, List<MushafAyah>> _pageCache = {};
@@ -570,7 +570,6 @@ class _AyahNumberCircle extends StatelessWidget {
   });
 
   static const Color _gold = Color(0xFFD4A843);
-  static const Color _darkBrown = Color(0xFF3E2723);
 
   String _toArabicNumerals(int n) {
     const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];

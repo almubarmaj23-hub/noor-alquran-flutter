@@ -617,7 +617,7 @@ class _TafsirTabState extends State<_TafsirTab> with AutomaticKeepAliveClientMix
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _ayahSearchController = TextEditingController();
 
-  static const Color _editionPrimary = Color(0xFF059669);
+
 
   @override
   bool get wantKeepAlive => true;
