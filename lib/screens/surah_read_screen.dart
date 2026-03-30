@@ -1810,9 +1810,9 @@ class _IrabTabState extends State<_IrabTab> with AutomaticKeepAliveClientMixin {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('الإعراب التفصيلي الحديث',
+                    Text('الإعراب التفصيلي',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.purple)),
-                    Text('وفق منهج الإعراب العربي الحديث',
+                    Text('وفق المنهج الحديث المعاصر في النحو العربي',
                         style: TextStyle(fontSize: 10, color: Colors.grey)),
                   ],
                 ),
