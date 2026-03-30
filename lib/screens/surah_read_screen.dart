@@ -112,6 +112,12 @@ class _SurahReadScreenState extends State<SurahReadScreen>
                   background: _buildAppBarBackground(provider),
                 ),
                 actions: [
+                  // Quick jump to ayah button
+                  IconButton(
+                    icon: const Icon(Icons.find_in_page_rounded, color: Colors.white, size: 24),
+                    onPressed: () => _showQuickAyahJump(),
+                    tooltip: 'انتقل إلى آية',
+                  ),
                   IconButton(
                     icon: const Icon(Icons.play_circle_filled, color: Colors.white, size: 30),
                     onPressed: () => provider.playSurah(widget.surah),
@@ -617,6 +623,126 @@ class _SurahReadScreenState extends State<SurahReadScreen>
         ayah: ayah,
       ),
     );
+  }
+
+  void _showQuickAyahJump() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _primaryGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.find_in_page_rounded, color: _primaryGreen, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Text('انتقل إلى آية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'اختر رقم الآية (1 - ${widget.surah.versesCount})',
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: 'رقم الآية',
+                  hintStyle: const TextStyle(fontSize: 16),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _primaryGreen, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                onSubmitted: (v) {
+                  Navigator.pop(ctx);
+                  final num = int.tryParse(v);
+                  if (num != null) _jumpAndShowTafsir(num);
+                },
+              ),
+              const SizedBox(height: 12),
+              // Quick action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildJumpAction(ctx, ctrl, 'القراءة', Icons.menu_book, _primaryGreen, 0),
+                  _buildJumpAction(ctx, ctrl, 'التفسير', Icons.auto_stories, const Color(0xFF1B5E20), 1),
+                  _buildJumpAction(ctx, ctrl, 'الإعراب', Icons.text_fields, Colors.purple, 2),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _primaryGreen),
+              onPressed: () {
+                Navigator.pop(ctx);
+                final num = int.tryParse(ctrl.text);
+                if (num != null) _jumpAndShowTafsir(num);
+              },
+              child: const Text('انتقل'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJumpAction(BuildContext dialogCtx, TextEditingController ctrl, String label, IconData icon, Color color, int tabIndex) {
+    return GestureDetector(
+      onTap: () {
+        final num = int.tryParse(ctrl.text);
+        if (num != null && num >= 1 && num <= widget.surah.versesCount) {
+          Navigator.pop(dialogCtx);
+          _tabController.animateTo(tabIndex);
+          _scrollToAyah(num);
+          // Save bookmark
+          BookmarkService.saveLastReading(widget.surah.id, num, widget.surah.nameArabic);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _jumpAndShowTafsir(int ayahNum) {
+    final clampedAyah = ayahNum.clamp(1, widget.surah.versesCount);
+    _scrollToAyah(clampedAyah);
+    setState(() => _selectedAyah = clampedAyah);
+    // Save bookmark
+    BookmarkService.saveLastReading(widget.surah.id, clampedAyah, widget.surah.nameArabic);
   }
 }
 
