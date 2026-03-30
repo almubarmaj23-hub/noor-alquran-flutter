@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/surah.dart';
 import '../providers/audio_provider.dart';
 import '../services/quran_service.dart';
+import '../services/bookmark_service.dart';
 
 class SurahReadScreen extends StatefulWidget {
   final Surah surah;
@@ -385,7 +386,15 @@ class _SurahReadScreenState extends State<SurahReadScreen>
         ],
       ),
       child: InkWell(
-        onTap: () => setState(() => _selectedAyah = isSelected ? null : ayah.numberInSurah),
+        onTap: () {
+          setState(() => _selectedAyah = isSelected ? null : ayah.numberInSurah);
+          // Save bookmark on tap
+          BookmarkService.saveLastReading(
+            widget.surah.id,
+            ayah.numberInSurah,
+            widget.surah.nameArabic,
+          );
+        },
         borderRadius: BorderRadius.circular(18),
         child: Padding(
           padding: const EdgeInsets.all(16),

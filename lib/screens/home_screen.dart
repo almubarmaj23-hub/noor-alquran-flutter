@@ -11,6 +11,7 @@ import 'tafsir_home_screen.dart';
 import 'surah_read_screen.dart';
 import 'mushaf_screen.dart';
 import '../data/surahs_data.dart';
+import '../services/bookmark_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -28,6 +29,13 @@ class HomeScreen extends StatelessWidget {
                 CustomScrollView(
                   slivers: [
                     SliverToBoxAdapter(child: HeaderWidget()),
+                    // Bookmark resume card
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _BookmarkResumeCard(),
+                      ),
+                    ),
                     // Feature cards
                     SliverToBoxAdapter(
                       child: Padding(
@@ -74,6 +82,152 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Bookmark resume card - shows last reading position
+class _BookmarkResumeCard extends StatefulWidget {
+  @override
+  State<_BookmarkResumeCard> createState() => _BookmarkResumeCardState();
+}
+
+class _BookmarkResumeCardState extends State<_BookmarkResumeCard> {
+  Map<String, dynamic>? _lastReading;
+  bool _hasBookmark = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookmark();
+  }
+
+  Future<void> _loadBookmark() async {
+    final has = await BookmarkService.hasBookmark();
+    if (has) {
+      final data = await BookmarkService.getLastReading();
+      if (mounted) {
+        setState(() {
+          _hasBookmark = true;
+          _lastReading = data;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_hasBookmark || _lastReading == null) return const SizedBox.shrink();
+
+    final provider = context.watch<AudioProvider>();
+    final isAr = provider.isArabic;
+    final surahName = _lastReading!['surahName'] as String;
+    final ayahNum = _lastReading!['ayahNumber'] as int;
+    final lastPage = _lastReading!['lastPage'] as int;
+    final timeAgo = BookmarkService.formatTimeAgo(_lastReading!['lastReadTime'] as String);
+
+    if (surahName.isEmpty && lastPage <= 1) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: () {
+        if (surahName.isNotEmpty && ayahNum > 0) {
+          final surahId = _lastReading!['surahId'] as int;
+          final surah = surahs.firstWhere(
+            (s) => s.id == surahId,
+            orElse: () => surahs.first,
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SurahReadScreen(
+                surah: surah,
+                initialAyah: ayahNum,
+              ),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MushafScreen(initialPage: lastPage),
+            ),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF064E3B), Color(0xFF065F46)],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF064E3B).withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+              ),
+              child: const Icon(Icons.bookmark_rounded, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isAr ? 'متابعة القراءة' : 'Continue Reading',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    surahName.isNotEmpty
+                        ? '${isAr ? "سورة" : "Surah"} $surahName - ${isAr ? "الآية" : "Ayah"} $ayahNum'
+                        : '${isAr ? "صفحة" : "Page"} $lastPage',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (timeAgo.isNotEmpty)
+                    Text(
+                      timeAgo,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -172,7 +326,6 @@ class _FeatureCards extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Handle bar
                   Container(
                     margin: const EdgeInsets.only(top: 12),
                     width: 40,

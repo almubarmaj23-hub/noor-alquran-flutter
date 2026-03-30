@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
+import '../services/bookmark_service.dart';
 
 class MushafScreen extends StatefulWidget {
   final int initialPage;
@@ -76,6 +77,8 @@ class _MushafScreenState extends State<MushafScreen>
   void _onPageChanged(int index) {
     final page = index + 1;
     setState(() => _currentPage = page);
+    // Auto-save bookmark
+    BookmarkService.saveLastPage(page);
     _loadPageData(page);
     if (page > 1) _loadPageData(page - 1);
     if (page < totalPages) _loadPageData(page + 1);
