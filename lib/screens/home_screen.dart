@@ -9,6 +9,7 @@ import '../widgets/audio_player_bar.dart';
 import '../widgets/footer_widget.dart';
 import 'tafsir_home_screen.dart';
 import 'surah_read_screen.dart';
+import 'mushaf_screen.dart';
 import '../data/surahs_data.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -83,46 +84,64 @@ class _FeatureCards extends StatelessWidget {
     final provider = context.watch<AudioProvider>();
     final isAr = provider.isArabic;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _FeatureCard(
-            icon: Icons.auto_stories,
-            title: isAr ? 'التفاسير' : 'Tafsir',
-            subtitle: isAr ? '10 تفاسير معتمدة' : '10 Tafsir Books',
-            gradient: const [Color(0xFF1B5E20), Color(0xFF388E3C)],
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const TafsirHomeScreen()),
-              );
-            },
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _FeatureCard(
+                icon: Icons.menu_book_rounded,
+                title: isAr ? 'المصحف' : 'Mushaf',
+                subtitle: isAr ? '٦٠٤ صفحة كاملة' : '604 Full Pages',
+                gradient: const [Color(0xFF5D4037), Color(0xFFD4A843)],
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MushafScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _FeatureCard(
+                icon: Icons.auto_stories,
+                title: isAr ? 'التفاسير' : 'Tafsir',
+                subtitle: isAr ? '10 تفاسير معتمدة' : '10 Tafsir Books',
+                gradient: const [Color(0xFF1B5E20), Color(0xFF388E3C)],
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const TafsirHomeScreen()),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _FeatureCard(
-            icon: Icons.text_fields,
-            title: isAr ? 'الإعراب' : "I'rab",
-            subtitle: isAr ? 'إعراب القرآن' : 'Grammar Analysis',
-            gradient: const [Color(0xFF4A148C), Color(0xFF7B1FA2)],
-            onTap: () {
-              _showSurahPicker(context, isAr, 2);
-            },
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _FeatureCard(
-            icon: Icons.help_outline,
-            title: isAr ? 'الغريب' : 'Gharib',
-            subtitle: isAr ? 'غريب القرآن' : 'Difficult Words',
-            gradient: const [Color(0xFFE65100), Color(0xFFFF6D00)],
-            onTap: () {
-              _showSurahPicker(context, isAr, 3);
-            },
-          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _FeatureCard(
+                icon: Icons.text_fields,
+                title: isAr ? 'الإعراب' : "I'rab",
+                subtitle: isAr ? 'إعراب القرآن' : 'Grammar Analysis',
+                gradient: const [Color(0xFF4A148C), Color(0xFF7B1FA2)],
+                onTap: () => _showSurahPicker(context, isAr, 2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _FeatureCard(
+                icon: Icons.help_outline,
+                title: isAr ? 'الغريب' : 'Gharib',
+                subtitle: isAr ? 'غريب القرآن' : 'Difficult Words',
+                gradient: const [Color(0xFFE65100), Color(0xFFFF6D00)],
+                onTap: () => _showSurahPicker(context, isAr, 3),
+              ),
+            ),
+          ],
         ),
       ],
     );
