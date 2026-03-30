@@ -166,6 +166,25 @@ class QuranService {
     } catch (_) {}
     return null;
   }
+
+  /// Fetch word-by-word data for Quran ayah
+  static Future<List<Map<String, dynamic>>> fetchWordByWord(int surahNumber, int ayahNumber) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.quran.com/api/v4/verses/by_key/$surahNumber:$ayahNumber?language=ar&words=true&word_fields=text_uthmani,translation'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final words = data['verse']?['words'] as List? ?? [];
+        return words.map((w) => {
+          'text': w['text_uthmani'] as String? ?? '',
+          'translation': w['translation']?['text'] as String? ?? '',
+          'transliteration': w['transliteration']?['text'] as String? ?? '',
+        }).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
 }
 
 class TafsirEdition {
