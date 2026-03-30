@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/surah.dart';
 import '../providers/audio_provider.dart';
 import '../services/quran_service.dart';
 
 class SurahReadScreen extends StatefulWidget {
   final Surah surah;
-  const SurahReadScreen({super.key, required this.surah});
+  final int? initialAyah;
+  const SurahReadScreen({super.key, required this.surah, this.initialAyah});
 
   @override
   State<SurahReadScreen> createState() => _SurahReadScreenState();
@@ -19,17 +22,24 @@ class _SurahReadScreenState extends State<SurahReadScreen>
   String? _error;
   int? _selectedAyah;
   late TabController _tabController;
+  final ScrollController _readingScrollController = ScrollController();
+
+  // Colors
+  static const Color _primaryGreen = Color(0xFF059669);
+  static const Color _darkGreen = Color(0xFF047857);
+  static const Color _teal = Color(0xFF0D9488);
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadAyahs();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _readingScrollController.dispose();
     super.dispose();
   }
 
@@ -45,6 +55,12 @@ class _SurahReadScreenState extends State<SurahReadScreen>
           _ayahs = ayahs;
           _isLoading = false;
         });
+        // Scroll to initial ayah if provided
+        if (widget.initialAyah != null && widget.initialAyah! > 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollToAyah(widget.initialAyah!);
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -56,159 +72,74 @@ class _SurahReadScreenState extends State<SurahReadScreen>
     }
   }
 
+  void _scrollToAyah(int ayahNumber) {
+    // Approximate scroll position
+    const cardHeight = 140.0;
+    final targetOffset = (ayahNumber - 1) * cardHeight;
+    if (_readingScrollController.hasClients) {
+      _readingScrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AudioProvider>();
-    final isAr = provider.isArabic;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0F1923) : const Color(0xFFF8FFFE),
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
               SliverAppBar(
-                expandedHeight: 200,
+                expandedHeight: 220,
                 floating: false,
                 pinned: true,
+                backgroundColor: _primaryGreen,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0xFF059669),
-                          Color(0xFF0D9488),
-                          Color(0xFF047857)
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 30),
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.3)),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${widget.surah.id}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            widget.surah.nameArabic,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '${widget.surah.nameEnglish} - ${widget.surah.versesCount} ${isAr ? "آية" : "verses"} - ${widget.surah.type}',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  background: _buildAppBarBackground(provider),
                 ),
                 actions: [
                   IconButton(
-                    icon: const Icon(Icons.play_circle_filled,
-                        color: Colors.white, size: 32),
+                    icon: const Icon(Icons.play_circle_filled, color: Colors.white, size: 30),
                     onPressed: () => provider.playSurah(widget.surah),
+                    tooltip: 'تشغيل السورة',
                   ),
                 ],
-                bottom: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor:
-                      Colors.white.withValues(alpha: 0.6),
-                  labelStyle: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.bold),
-                  tabs: const [
-                    Tab(text: 'القراءة'),
-                    Tab(text: 'التفسير'),
-                    Tab(text: 'الإعراب'),
-                    Tab(text: 'غريب القرآن'),
-                  ],
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(48),
+                  child: _buildTabBar(),
                 ),
               ),
             ];
           },
           body: _isLoading
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                          color: Color(0xFF059669)),
-                      SizedBox(height: 16),
-                      Text('جاري تحميل الآيات...'),
-                    ],
-                  ),
-                )
+              ? _buildLoadingWidget()
               : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(_error!,
-                              textAlign: TextAlign.center),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: _loadAyahs,
-                            child: const Text('إعادة المحاولة'),
-                          ),
-                        ],
-                      ),
-                    )
+                  ? _buildErrorWidget()
                   : TabBarView(
                       controller: _tabController,
                       children: [
                         _buildReadingTab(theme, isDark),
-                        _TafsirTab(
+                        _TafsirTab(surah: widget.surah, ayahs: _ayahs),
+                        _IrabTab(surah: widget.surah, ayahs: _ayahs),
+                        _GharibTab(surah: widget.surah, ayahs: _ayahs),
+                        _AyahNavigatorTab(
                           surah: widget.surah,
                           ayahs: _ayahs,
-                        ),
-                        _IrabTab(
-                          surah: widget.surah,
-                          ayahs: _ayahs,
-                        ),
-                        _GharibTab(
-                          surah: widget.surah,
-                          ayahs: _ayahs,
+                          onNavigateToTafsir: () => _tabController.animateTo(1),
+                          onNavigateToIrab: () => _tabController.animateTo(2),
                         ),
                       ],
                     ),
@@ -217,38 +148,213 @@ class _SurahReadScreenState extends State<SurahReadScreen>
     );
   }
 
+  Widget _buildAppBarBackground(AudioProvider provider) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF064E3B), _primaryGreen, _teal],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 56),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${widget.surah.id}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.surah.nameArabic,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      Text(
+                        widget.surah.nameEnglish,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildInfoChip(Icons.format_list_numbered_rtl, '${widget.surah.versesCount} آية'),
+                  const SizedBox(width: 8),
+                  _buildInfoChip(
+                    widget.surah.type == 'مكية' ? Icons.wb_sunny_outlined : Icons.location_city_outlined,
+                    widget.surah.type,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildInfoChip(Icons.menu_book_outlined, 'السورة ${widget.surah.id}'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      color: _primaryGreen,
+      child: TabBar(
+        controller: _tabController,
+        isScrollable: true,
+        indicatorColor: Colors.white,
+        indicatorWeight: 3,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        unselectedLabelStyle: const TextStyle(fontSize: 13),
+        tabs: const [
+          Tab(icon: Icon(Icons.menu_book, size: 16), text: 'القراءة'),
+          Tab(icon: Icon(Icons.auto_stories, size: 16), text: 'التفسير'),
+          Tab(icon: Icon(Icons.text_fields, size: 16), text: 'الإعراب'),
+          Tab(icon: Icon(Icons.help_outline, size: 16), text: 'الغريب'),
+          Tab(icon: Icon(Icons.find_in_page, size: 16), text: 'الآيات'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: _primaryGreen, strokeWidth: 3),
+          const SizedBox(height: 20),
+          Text(
+            'جاري تحميل سورة ${widget.surah.nameArabic}...',
+            style: const TextStyle(fontSize: 16, color: _primaryGreen),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wifi_off, size: 40, color: Colors.red),
+            ),
+            const SizedBox(height: 20),
+            Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _loadAyahs,
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
+              style: FilledButton.styleFrom(backgroundColor: _primaryGreen),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildReadingTab(ThemeData theme, bool isDark) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      controller: _readingScrollController,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
         // Bismillah
         if (widget.surah.id != 1 && widget.surah.id != 9)
           Container(
             margin: const EdgeInsets.only(bottom: 20),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1A2E1A)
-                  : const Color(0xFFF0FFF4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFF059669).withValues(alpha: 0.3),
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
+                    : [const Color(0xFFF0FFF4), const Color(0xFFDCFCE7)],
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _primaryGreen.withValues(alpha: 0.3)),
             ),
             child: const Center(
               child: Text(
                 'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 26,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF059669),
+                  color: _primaryGreen,
                   height: 2,
                 ),
                 textAlign: TextAlign.center,
               ),
             ),
           ),
-        // Ayahs
         ..._ayahs.map((ayah) => _buildAyahCard(ayah, theme, isDark)),
       ],
     );
@@ -256,180 +362,239 @@ class _SurahReadScreenState extends State<SurahReadScreen>
 
   Widget _buildAyahCard(Ayah ayah, ThemeData theme, bool isDark) {
     final isSelected = _selectedAyah == ayah.numberInSurah;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedAyah =
-              isSelected ? null : ayah.numberInSurah;
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark
-                  ? const Color(0xFF1A3A2A)
-                  : const Color(0xFFE8F5E9))
-              : (isDark
-                  ? theme.colorScheme.surfaceContainerHighest
-                  : Colors.white),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF059669)
-                : theme.colorScheme.outline.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? (isDark ? const Color(0xFF052E16) : const Color(0xFFECFDF5))
+            : (isDark ? const Color(0xFF1C2A36) : Colors.white),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isSelected ? _primaryGreen : theme.colorScheme.outline.withValues(alpha: 0.08),
+          width: isSelected ? 2 : 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Ayah header
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF059669), Color(0xFF0D9488)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${ayah.numberInSurah}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                if (ayah.juz > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF059669)
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'الجزء ${ayah.juz}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF059669),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                if (ayah.page > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'صفحة ${ayah.page}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.blue[700],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Ayah text
-            Text(
-              ayah.text,
-              style: const TextStyle(
-                fontSize: 22,
-                height: 2.2,
-                fontWeight: FontWeight.w400,
-              ),
-              textAlign: TextAlign.justify,
-              textDirection: TextDirection.rtl,
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 12),
-              const Divider(),
+        boxShadow: [
+          BoxShadow(
+            color: isSelected
+                ? _primaryGreen.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: isSelected ? 12 : 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => setState(() => _selectedAyah = isSelected ? null : ayah.numberInSurah),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header row
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildActionChip(
-                    icon: Icons.book,
-                    label: 'التفسير',
-                    onTap: () {
-                      _tabController.animateTo(1);
-                    },
+                  // Ayah number badge
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_primaryGreen, _darkGreen],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${ayah.numberInSurah}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ),
-                  _buildActionChip(
-                    icon: Icons.text_fields,
-                    label: 'الإعراب',
-                    onTap: () {
-                      _tabController.animateTo(2);
-                    },
-                  ),
-                  _buildActionChip(
-                    icon: Icons.help_outline,
-                    label: 'الغريب',
-                    onTap: () {
-                      _tabController.animateTo(3);
-                    },
+                  const Spacer(),
+                  // Meta chips
+                  if (ayah.juz > 0) ...[
+                    _buildMetaChip('جزء ${ayah.juz}', Colors.teal),
+                    const SizedBox(width: 4),
+                  ],
+                  if (ayah.page > 0)
+                    _buildMetaChip('ص${ayah.page}', Colors.blue),
+                  // Action menu
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert,
+                        size: 20,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                    onSelected: (value) => _handleAyahAction(value, ayah),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'copy',
+                        child: Row(
+                          children: [
+                            Icon(Icons.copy, size: 18, color: Color(0xFF059669)),
+                            SizedBox(width: 8),
+                            Text('نسخ الآية'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'share',
+                        child: Row(
+                          children: [
+                            Icon(Icons.share, size: 18, color: Color(0xFF0D9488)),
+                            SizedBox(width: 8),
+                            Text('مشاركة الآية'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'tafsir',
+                        child: Row(
+                          children: [
+                            Icon(Icons.auto_stories, size: 18, color: Color(0xFF1B5E20)),
+                            SizedBox(width: 8),
+                            Text('تفسير هذه الآية'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'irab',
+                        child: Row(
+                          children: [
+                            Icon(Icons.text_fields, size: 18, color: Colors.purple),
+                            SizedBox(width: 8),
+                            Text('إعراب هذه الآية'),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              // Ayah text
+              Text(
+                ayah.text,
+                style: TextStyle(
+                  fontSize: 24,
+                  height: 2.3,
+                  fontWeight: FontWeight.w400,
+                  color: isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF1A1A1A),
+                ),
+                textAlign: TextAlign.justify,
+                textDirection: TextDirection.rtl,
+              ),
+              // Action bar when selected
+              if (isSelected) ...[
+                const SizedBox(height: 12),
+                Divider(color: _primaryGreen.withValues(alpha: 0.2)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildQuickAction(Icons.auto_stories, 'التفسير', _primaryGreen, () {
+                      _tabController.animateTo(1);
+                    }),
+                    _buildQuickAction(Icons.text_fields, 'الإعراب', Colors.purple, () {
+                      _tabController.animateTo(2);
+                    }),
+                    _buildQuickAction(Icons.help_outline, 'الغريب', Colors.deepOrange, () {
+                      _tabController.animateTo(3);
+                    }),
+                    _buildQuickAction(Icons.copy, 'نسخ', Colors.blue, () {
+                      _handleAyahAction('copy', ayah);
+                    }),
+                    _buildQuickAction(Icons.share, 'مشاركة', Colors.teal, () {
+                      _handleAyahAction('share', ayah);
+                    }),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildActionChip({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFF059669).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: const Color(0xFF059669)),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF059669),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+  Widget _buildMetaChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
       ),
     );
+  }
+
+  Widget _buildQuickAction(IconData icon, String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  void _handleAyahAction(String action, Ayah ayah) {
+    final surahName = widget.surah.nameArabic;
+    final ayahText = ayah.text;
+    final ayahNum = ayah.numberInSurah;
+    final reference = 'سورة $surahName - الآية $ayahNum';
+
+    switch (action) {
+      case 'copy':
+        Clipboard.setData(ClipboardData(text: '$ayahText\n($reference)'));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('تم نسخ الآية بنجاح'),
+              ],
+            ),
+            backgroundColor: _primaryGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        break;
+      case 'share':
+        SharePlus.instance.share(ShareParams(
+          text: '$ayahText\n\n$reference\n\nمن تطبيق نور القرآن',
+          subject: reference,
+        ));
+        break;
+      case 'tafsir':
+        _tabController.animateTo(1);
+        break;
+      case 'irab':
+        _tabController.animateTo(2);
+        break;
+    }
   }
 }
 
@@ -443,12 +608,16 @@ class _TafsirTab extends StatefulWidget {
   State<_TafsirTab> createState() => _TafsirTabState();
 }
 
-class _TafsirTabState extends State<_TafsirTab>
-    with AutomaticKeepAliveClientMixin {
+class _TafsirTabState extends State<_TafsirTab> with AutomaticKeepAliveClientMixin {
   String _selectedEdition = 'ar-tafsir-ibn-kathir';
   List<TafsirAyah> _tafsirData = [];
   bool _isLoading = false;
   String? _error;
+  int? _jumpToAyah;
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _ayahSearchController = TextEditingController();
+
+  static const Color _editionPrimary = Color(0xFF059669);
 
   @override
   bool get wantKeepAlive => true;
@@ -459,32 +628,115 @@ class _TafsirTabState extends State<_TafsirTab>
     _loadTafsir();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _ayahSearchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadTafsir() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
     try {
-      final data =
-          await QuranService.fetchTafsir(_selectedEdition, widget.surah.id);
-      if (mounted) {
-        setState(() {
-          _tafsirData = data;
-          _isLoading = false;
-        });
-      }
+      final data = await QuranService.fetchTafsir(_selectedEdition, widget.surah.id);
+      if (mounted) setState(() { _tafsirData = data; _isLoading = false; });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'فشل في تحميل التفسير';
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _error = 'فشل في تحميل التفسير'; _isLoading = false; });
     }
   }
 
-  TafsirEdition get _currentEdition => QuranService.tafsirEditions
-      .firstWhere((e) => e.id == _selectedEdition);
+  TafsirEdition get _currentEdition =>
+      QuranService.tafsirEditions.firstWhere((e) => e.id == _selectedEdition);
+
+  void _showAyahJumpDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.find_in_page, color: Color(_currentEdition.color)),
+              const SizedBox(width: 8),
+              const Text('انتقل إلى آية', style: TextStyle(fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'أدخل رقم الآية (1 - ${widget.surah.versesCount})',
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: 'رقم الآية',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Color(_currentEdition.color), width: 2),
+                  ),
+                ),
+                onSubmitted: (v) {
+                  Navigator.pop(ctx);
+                  _jumpToAyahNumber(int.tryParse(v) ?? 1);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Color(_currentEdition.color)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _jumpToAyahNumber(int.tryParse(ctrl.text) ?? 1);
+              },
+              child: const Text('انتقل'),
+            ),
+          ],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+    );
+  }
+
+  void _jumpToAyahNumber(int ayahNum) {
+    final clampedAyah = ayahNum.clamp(1, widget.surah.versesCount);
+    setState(() => _jumpToAyah = clampedAyah);
+    // Scroll to the ayah
+    final index = _tafsirData.indexWhere((t) => t.ayahNumber == clampedAyah);
+    if (index != -1 && _scrollController.hasClients) {
+      const cardHeight = 200.0;
+      _scrollController.animateTo(
+        index * cardHeight,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _shareTafsirAyah(TafsirAyah tafsir) {
+    final ayahObj = widget.ayahs.where((a) => a.numberInSurah == tafsir.ayahNumber).firstOrNull;
+    final surahName = widget.surah.nameArabic;
+    final text = StringBuffer();
+    text.writeln('📖 تفسير الآية ${tafsir.ayahNumber} من سورة $surahName');
+    text.writeln('المصدر: ${_currentEdition.name}');
+    text.writeln();
+    if (ayahObj != null) {
+      text.writeln('﴿ ${ayahObj.text} ﴾');
+      text.writeln();
+    }
+    text.writeln(tafsir.text);
+    text.writeln();
+    text.writeln('— من تطبيق نور القرآن');
+    SharePlus.instance.share(ShareParams(text: text.toString()));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -494,118 +746,101 @@ class _TafsirTabState extends State<_TafsirTab>
 
     return Column(
       children: [
-        // Tafsir selector
+        // ---- Edition Selector ----
         Container(
-          height: 110,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: QuranService.tafsirEditions.length,
-            itemBuilder: (context, index) {
-              final edition = QuranService.tafsirEditions[index];
-              final isSelected = edition.id == _selectedEdition;
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _selectedEdition = edition.id);
-                  _loadTafsir();
-                },
-                child: Container(
-                  width: 130,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? LinearGradient(
-                            colors: [
-                              Color(edition.color),
-                              Color(edition.color).withValues(alpha: 0.8),
-                            ],
-                          )
-                        : null,
-                    color: isSelected
-                        ? null
-                        : (isDark
-                            ? theme.colorScheme.surfaceContainerHighest
-                            : Colors.grey[100]),
-                    borderRadius: BorderRadius.circular(16),
-                    border: isSelected
-                        ? null
-                        : Border.all(
-                            color: theme.colorScheme.outline
-                                .withValues(alpha: 0.2)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _getIconData(edition.icon),
-                        size: 24,
-                        color: isSelected
-                            ? Colors.white
-                            : Color(edition.color),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        edition.name,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? Colors.white
-                              : theme.colorScheme.onSurface,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        // Current edition info
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Color(_currentEdition.color).withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Color(_currentEdition.color).withValues(alpha: 0.2),
-            ),
+            color: isDark ? const Color(0xFF1C2A36) : Colors.white,
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
           ),
-          child: Row(
+          child: Column(
             children: [
-              Icon(
-                _getIconData(_currentEdition.icon),
-                color: Color(_currentEdition.color),
-                size: 20,
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  itemCount: QuranService.tafsirEditions.length,
+                  itemBuilder: (context, index) {
+                    final edition = QuranService.tafsirEditions[index];
+                    final isSelected = edition.id == _selectedEdition;
+                    return GestureDetector(
+                      onTap: () { setState(() => _selectedEdition = edition.id); _loadTafsir(); },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 120,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: isSelected ? LinearGradient(
+                            colors: [Color(edition.color), Color(edition.color).withValues(alpha: 0.7)],
+                          ) : null,
+                          color: isSelected ? null : (isDark ? const Color(0xFF2A3A46) : Colors.grey[100]),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSelected ? Color(edition.color) : Colors.transparent,
+                            width: 1.5,
+                          ),
+                          boxShadow: isSelected ? [
+                            BoxShadow(color: Color(edition.color).withValues(alpha: 0.3), blurRadius: 8)
+                          ] : null,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(_getIconData(edition.icon), size: 22,
+                                color: isSelected ? Colors.white : Color(edition.color)),
+                            const SizedBox(height: 5),
+                            Text(
+                              edition.name,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? Colors.white : theme.colorScheme.onSurface,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Edition info + jump to ayah
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Row(
                   children: [
-                    Text(
-                      _currentEdition.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(_currentEdition.color),
+                    Icon(_getIconData(_currentEdition.icon), color: Color(_currentEdition.color), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _currentEdition.name,
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(_currentEdition.color)),
+                          ),
+                          Text(
+                            _currentEdition.author,
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      '${_currentEdition.author} - ${_currentEdition.description}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.6),
+                    // Jump to ayah button
+                    TextButton.icon(
+                      onPressed: _showAyahJumpDialog,
+                      icon: Icon(Icons.find_in_page, size: 16, color: Color(_currentEdition.color)),
+                      label: Text(
+                        'انتقل لآية',
+                        style: TextStyle(fontSize: 12, color: Color(_currentEdition.color)),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
                     ),
                   ],
                 ),
@@ -613,45 +848,38 @@ class _TafsirTabState extends State<_TafsirTab>
             ],
           ),
         ),
-        // Tafsir content
+        // ---- Content ----
         Expanded(
           child: _isLoading
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                          color: Color(0xFF059669)),
-                      SizedBox(height: 12),
-                      Text('جاري تحميل التفسير...'),
-                    ],
-                  ),
-                )
+              ? const Center(child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Color(0xFF059669)),
+                    SizedBox(height: 12),
+                    Text('جاري تحميل التفسير...'),
+                  ],
+                ))
               : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              size: 48, color: Colors.red),
-                          const SizedBox(height: 12),
-                          Text(_error!),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: _loadTafsir,
-                            child: const Text('إعادة المحاولة'),
-                          ),
-                        ],
-                      ),
-                    )
+                  ? Center(child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 12),
+                        Text(_error!),
+                        const SizedBox(height: 12),
+                        FilledButton(onPressed: _loadTafsir, child: const Text('إعادة المحاولة')),
+                      ],
+                    ))
                   : _tafsirData.isEmpty
                       ? _buildNoDataWidget()
                       : ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                           itemCount: _tafsirData.length,
                           itemBuilder: (context, index) {
-                            return _buildTafsirCard(
-                                _tafsirData[index], theme, isDark);
+                            final tafsir = _tafsirData[index];
+                            final isHighlighted = _jumpToAyah == tafsir.ayahNumber;
+                            return _buildTafsirCard(tafsir, theme, isDark, isHighlighted);
                           },
                         ),
         ),
@@ -664,93 +892,109 @@ class _TafsirTabState extends State<_TafsirTab>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_stories,
-              size: 64,
-              color: Colors.grey.withValues(alpha: 0.5)),
+          Icon(Icons.auto_stories, size: 64, color: Colors.grey.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
-          const Text(
-            'لا يتوفر تفسير لهذه السورة في هذا الإصدار',
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
+          const Text('لا يتوفر تفسير لهذه السورة', style: TextStyle(fontSize: 16)),
           const SizedBox(height: 8),
-          const Text(
-            'جرب اختيار تفسير آخر',
-            style: TextStyle(color: Colors.grey),
-          ),
+          const Text('جرب اختيار تفسير آخر', style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
   }
 
-  Widget _buildTafsirCard(
-      TafsirAyah tafsir, ThemeData theme, bool isDark) {
-    // Find the matching ayah
-    final ayahText = widget.ayahs
-        .where((a) => a.numberInSurah == tafsir.ayahNumber)
-        .firstOrNull
-        ?.text;
+  Widget _buildTafsirCard(TafsirAyah tafsir, ThemeData theme, bool isDark, bool isHighlighted) {
+    final ayahText = widget.ayahs.where((a) => a.numberInSurah == tafsir.ayahNumber).firstOrNull?.text;
+    final editionColor = Color(_currentEdition.color);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDark
-            ? theme.colorScheme.surfaceContainerHighest
-            : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF1C2A36) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: isHighlighted ? Border.all(color: editionColor, width: 2) : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: isHighlighted
+                ? editionColor.withValues(alpha: 0.15)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: isHighlighted ? 16 : 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Ayah number header
+          // Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Color(_currentEdition.color),
-                  Color(_currentEdition.color).withValues(alpha: 0.8),
-                ],
+                colors: [editionColor, editionColor.withValues(alpha: 0.75)],
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
               ),
               borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(16),
-                topLeft: Radius.circular(16),
+                topRight: Radius.circular(18),
+                topLeft: Radius.circular(18),
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       '${tafsir.ayahNumber}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Text(
                   'الآية ${tafsir.ayahNumber}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const Spacer(),
+                // Share button
+                GestureDetector(
+                  onTap: () => _shareTafsirAyah(tafsir),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.share_outlined, color: Colors.white, size: 16),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Copy tafsir button
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: tafsir.text));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('تم نسخ التفسير'),
+                        backgroundColor: editionColor,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.copy_outlined, color: Colors.white, size: 16),
                   ),
                 ),
               ],
@@ -759,18 +1003,20 @@ class _TafsirTabState extends State<_TafsirTab>
           // Ayah text
           if (ayahText != null)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
-                color: Color(_currentEdition.color)
-                    .withValues(alpha: 0.05),
+                color: editionColor.withValues(alpha: 0.04),
+                border: Border(
+                  bottom: BorderSide(color: editionColor.withValues(alpha: 0.1)),
+                ),
               ),
               child: Text(
                 ayahText,
-                style: const TextStyle(
-                  fontSize: 20,
-                  height: 2,
+                style: TextStyle(
+                  fontSize: 21,
+                  height: 2.1,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF059669),
+                  color: editionColor.withValues(alpha: 0.9),
                 ),
                 textAlign: TextAlign.center,
                 textDirection: TextDirection.rtl,
@@ -782,9 +1028,9 @@ class _TafsirTabState extends State<_TafsirTab>
             child: Text(
               tafsir.text,
               style: TextStyle(
-                fontSize: 16,
-                height: 1.9,
-                color: theme.colorScheme.onSurface,
+                fontSize: 15.5,
+                height: 2.0,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.88),
               ),
               textAlign: TextAlign.justify,
               textDirection: TextDirection.rtl,
@@ -796,34 +1042,23 @@ class _TafsirTabState extends State<_TafsirTab>
   }
 
   IconData _getIconData(String iconName) {
-    switch (iconName) {
-      case 'book':
-        return Icons.book;
-      case 'history_edu':
-        return Icons.history_edu;
-      case 'gavel':
-        return Icons.gavel;
-      case 'auto_stories':
-        return Icons.auto_stories;
-      case 'menu_book':
-        return Icons.menu_book;
-      case 'school':
-        return Icons.school;
-      case 'lightbulb':
-        return Icons.lightbulb;
-      case 'wb_sunny':
-        return Icons.wb_sunny;
-      case 'summarize':
-        return Icons.summarize;
-      case 'translate':
-        return Icons.translate;
-      default:
-        return Icons.book;
-    }
+    const map = {
+      'book': Icons.book,
+      'history_edu': Icons.history_edu,
+      'gavel': Icons.gavel,
+      'auto_stories': Icons.auto_stories,
+      'menu_book': Icons.menu_book,
+      'school': Icons.school,
+      'lightbulb': Icons.lightbulb,
+      'wb_sunny': Icons.wb_sunny,
+      'summarize': Icons.summarize,
+      'translate': Icons.translate,
+    };
+    return map[iconName] ?? Icons.book;
   }
 }
 
-/// =========== I'RAB TAB ===========
+/// =========== I'RAB TAB (Modern Arabic Grammar) ===========
 class _IrabTab extends StatefulWidget {
   final Surah surah;
   final List<Ayah> ayahs;
@@ -833,11 +1068,11 @@ class _IrabTab extends StatefulWidget {
   State<_IrabTab> createState() => _IrabTabState();
 }
 
-class _IrabTabState extends State<_IrabTab>
-    with AutomaticKeepAliveClientMixin {
-  final Map<int, String> _irabCache = {};
+class _IrabTabState extends State<_IrabTab> with AutomaticKeepAliveClientMixin {
+  final Map<int, List<_WordIrab>> _irabCache = {};
   bool _isLoading = false;
   int _selectedAyahIndex = 0;
+  bool _showWordView = true; // word view or full view
 
   @override
   bool get wantKeepAlive => true;
@@ -846,196 +1081,238 @@ class _IrabTabState extends State<_IrabTab>
   void initState() {
     super.initState();
     if (widget.ayahs.isNotEmpty) {
-      _loadIrab(widget.ayahs.first.numberInSurah);
+      _loadIrab(0);
     }
   }
 
-  Future<void> _loadIrab(int ayahNumber) async {
-    if (_irabCache.containsKey(ayahNumber)) {
-      setState(() => _selectedAyahIndex =
-          widget.ayahs.indexWhere((a) => a.numberInSurah == ayahNumber));
-      return;
-    }
+  Future<void> _loadIrab(int index) async {
+    if (index < 0 || index >= widget.ayahs.length) return;
+    final ayah = widget.ayahs[index];
 
     setState(() {
       _isLoading = true;
-      _selectedAyahIndex =
-          widget.ayahs.indexWhere((a) => a.numberInSurah == ayahNumber);
+      _selectedAyahIndex = index;
     });
 
-    // Generate I'rab analysis based on known Arabic grammar patterns
-    final ayah = widget.ayahs
-        .firstWhere((a) => a.numberInSurah == ayahNumber);
-    final irabText = _generateIrab(ayah.text, ayahNumber);
+    await Future.delayed(const Duration(milliseconds: 150)); // smooth transition
 
-    if (mounted) {
-      setState(() {
-        _irabCache[ayahNumber] = irabText;
-        _isLoading = false;
-      });
+    if (!_irabCache.containsKey(ayah.numberInSurah)) {
+      _irabCache[ayah.numberInSurah] = _analyzeAyah(ayah.text);
     }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  String _generateIrab(String ayahText, int ayahNumber) {
-    // Comprehensive I'rab analysis generation
-    final words = ayahText.split(RegExp(r'\s+'));
-    final buffer = StringBuffer();
+  // Modern Arabic Grammar Analysis
+  List<_WordIrab> _analyzeAyah(String text) {
+    final words = text.split(RegExp(r'\s+'));
+    final results = <_WordIrab>[];
 
     for (int i = 0; i < words.length; i++) {
-      final word = words[i].replaceAll(RegExp(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]'), '');
-      if (word.isEmpty) continue;
-
-      buffer.writeln('${words[i]}:');
-      buffer.writeln(_analyzeWord(words[i], word, i, words.length));
-      buffer.writeln();
+      if (words[i].trim().isEmpty) continue;
+      final fullWord = words[i];
+      final clean = _removeHarakat(fullWord);
+      results.add(_analyzeWordModern(fullWord, clean, i, words.length));
     }
-
-    return buffer.toString();
+    return results;
   }
 
-  String _analyzeWord(String fullWord, String baseWord, int position, int total) {
-    // Enhanced Arabic grammar analysis
-    if (_isParticle(baseWord)) {
-      return '  ${_getParticleIrab(baseWord)}';
-    }
-    if (_isPreposition(baseWord)) {
-      return '  حرف جر مبني على ${_getHaraka(fullWord)} لا محل له من الإعراب';
-    }
-    if (_isConjunction(baseWord)) {
-      return '  حرف عطف مبني على الفتح لا محل له من الإعراب';
-    }
-    if (_isPronoun(baseWord)) {
-      return '  ${_getPronounIrab(baseWord, position)}';
-    }
-    if (_isDemonstrativePronoun(baseWord)) {
-      return '  اسم إشارة مبني في محل ${position == 0 ? "رفع مبتدأ" : "نصب"}';
-    }
-    if (_isRelativePronoun(baseWord)) {
-      return '  اسم موصول مبني في محل ${position == 0 ? "رفع" : "نصب أو جر"}';
-    }
-
-    // Default noun/verb analysis
-    if (_looksLikeVerb(baseWord)) {
-      return '  ${_getVerbIrab(baseWord, fullWord, position)}';
-    }
-    return '  ${_getNounIrab(baseWord, fullWord, position, total)}';
+  String _removeHarakat(String word) {
+    return word.replaceAll(
+      RegExp(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u0600-\u0605\u06DD]'),
+      '',
+    );
   }
 
-  bool _isParticle(String word) {
-    const particles = ['إن', 'أن', 'لكن', 'لعل', 'ليت', 'كأن', 'لا', 'ما', 'إلا', 'قد', 'سوف', 'لن', 'لم', 'إذا', 'إذ', 'ثم', 'حتى', 'كي', 'لو', 'بل'];
-    return particles.contains(word);
+  _WordIrab _analyzeWordModern(String full, String clean, int pos, int total) {
+    Map<String, String>? m;
+    
+    m = _checkParticles(clean);
+    if (m != null) return _WordIrab.fromMap(full, clean, m);
+
+    m = _checkPronouns(clean, pos);
+    if (m != null) return _WordIrab.fromMap(full, clean, m);
+
+    if (_isVerb(clean)) {
+      return _WordIrab.fromMap(full, clean, _analyzeVerb(clean, full, pos));
+    }
+
+    return _WordIrab.fromMap(full, clean, _analyzeNoun(clean, full, pos, total));
   }
 
-  String _getParticleIrab(String word) {
-    final map = {
-      'إن': 'حرف توكيد ونصب مبني على الفتح، ينصب الاسم ويرفع الخبر',
-      'أن': 'حرف مصدري ونصب مبني على الفتح',
-      'لكن': 'حرف استدراك ونصب مبني على الفتح',
-      'لعل': 'حرف ترجٍّ ونصب مبني على الفتح',
-      'ليت': 'حرف تمنٍّ ونصب مبني على الفتح',
-      'كأن': 'حرف تشبيه ونصب مبني على الفتح',
-      'لا': 'حرف نفي مبني على السكون لا محل له من الإعراب',
-      'ما': 'حرف نفي مبني على السكون لا محل له من الإعراب',
-      'إلا': 'أداة استثناء مبنية على السكون لا محل لها من الإعراب',
-      'قد': 'حرف تحقيق مبني على السكون لا محل له من الإعراب',
-      'سوف': 'حرف استقبال مبني على الفتح لا محل له من الإعراب',
-      'لن': 'حرف نصب ونفي واستقبال مبني على السكون',
-      'لم': 'حرف جزم ونفي وقلب مبني على السكون',
-      'إذا': 'ظرف لما يُستقبل من الزمان متضمن معنى الشرط',
-      'إذ': 'ظرف للزمان الماضي مبني على السكون في محل نصب',
-      'ثم': 'حرف عطف للترتيب والتراخي مبني على الفتح',
-      'حتى': 'حرف غاية وجر مبني على السكون',
-      'كي': 'حرف مصدري ونصب مبني على السكون',
-      'لو': 'حرف شرط غير جازم (حرف امتناع لامتناع)',
-      'بل': 'حرف إضراب مبني على السكون',
+  Map<String, String>? _checkParticles(String w) {
+    final particles = <String, Map<String, String>>{
+      'إن': {'type': 'حرف', 'category': 'حرف ناسخ', 'irab': 'حرف توكيد ونصب', 'build': 'مبني على الفتح، ينصب الاسم ويرفع الخبر', 'note': 'من أخوات إنّ'},
+      'أن': {'type': 'حرف', 'category': 'حرف ناسخ', 'irab': 'حرف مصدري ونصب', 'build': 'مبني على الفتح'},
+      'كأن': {'type': 'حرف', 'category': 'حرف ناسخ', 'irab': 'حرف تشبيه ونصب', 'build': 'مبني على الفتح'},
+      'لكن': {'type': 'حرف', 'category': 'حرف ناسخ', 'irab': 'حرف استدراك ونصب', 'build': 'مبني على الفتح'},
+      'ليت': {'type': 'حرف', 'category': 'حرف ناسخ', 'irab': 'حرف تمنٍّ ونصب', 'build': 'مبني على الفتح'},
+      'لعل': {'type': 'حرف', 'category': 'حرف ناسخ', 'irab': 'حرف ترجٍّ ونصب', 'build': 'مبني على الفتح'},
+      'لا': {'type': 'حرف', 'category': 'حرف نفي', 'irab': 'حرف نفي', 'build': 'مبني على السكون، لا محل له من الإعراب'},
+      'ما': {'type': 'حرف', 'category': 'حرف نفي/مصدري', 'irab': 'حرف نفي أو اسم موصول', 'build': 'مبني على السكون'},
+      'لم': {'type': 'حرف', 'category': 'حرف جازم', 'irab': 'حرف جزم ونفي وقلب', 'build': 'مبني على السكون، يجزم الفعل المضارع'},
+      'لن': {'type': 'حرف', 'category': 'حرف ناصب', 'irab': 'حرف نفي ونصب واستقبال', 'build': 'مبني على السكون، ينصب الفعل المضارع'},
+      'قد': {'type': 'حرف', 'category': 'حرف تحقيق', 'irab': 'حرف تحقيق وتوقع', 'build': 'مبني على السكون، لا محل له من الإعراب'},
+      'سوف': {'type': 'حرف', 'category': 'حرف تسويف', 'irab': 'حرف استقبال وتسويف', 'build': 'مبني على الفتح، لا محل له من الإعراب'},
+      'بل': {'type': 'حرف', 'category': 'حرف عطف', 'irab': 'حرف إضراب وعطف', 'build': 'مبني على السكون'},
+      'حتى': {'type': 'حرف', 'category': 'حرف غاية', 'irab': 'حرف غاية وجر أو ناصب', 'build': 'مبني على السكون'},
+      'كي': {'type': 'حرف', 'category': 'حرف تعليل', 'irab': 'حرف تعليل ونصب', 'build': 'مبني على السكون'},
+      'لو': {'type': 'حرف', 'category': 'حرف شرط', 'irab': 'حرف شرط غير جازم', 'build': 'مبني على السكون، يدل على امتناع الجواب لامتناع الشرط'},
+      'إذا': {'type': 'ظرف', 'category': 'ظرف زمان', 'irab': 'ظرف لما يستقبل من الزمان', 'build': 'مبني على السكون في محل نصب، متضمن معنى الشرط'},
+      'إذ': {'type': 'ظرف', 'category': 'ظرف زمان', 'irab': 'ظرف زمان للماضي', 'build': 'مبني على السكون في محل نصب'},
+      'إلا': {'type': 'أداة', 'category': 'أداة استثناء', 'irab': 'أداة حصر واستثناء', 'build': 'مبني على السكون، لا محل له من الإعراب'},
+      'ثم': {'type': 'حرف', 'category': 'حرف عطف', 'irab': 'حرف عطف للترتيب والتراخي', 'build': 'مبني على الفتح'},
+      'و': {'type': 'حرف', 'category': 'حرف عطف', 'irab': 'حرف عطف للجمع', 'build': 'مبني على الفتح'},
+      'ف': {'type': 'حرف', 'category': 'حرف عطف', 'irab': 'حرف عطف للترتيب والتعقيب', 'build': 'مبني على الفتح'},
+      'أو': {'type': 'حرف', 'category': 'حرف عطف', 'irab': 'حرف عطف للتخيير أو الإباحة', 'build': 'مبني على السكون'},
+      'في': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر', 'build': 'مبني على السكون، يجر ما بعده'},
+      'من': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للابتداء أو التبعيض', 'build': 'مبني على السكون'},
+      'إلى': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للانتهاء', 'build': 'مبني على السكون'},
+      'على': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للاستعلاء', 'build': 'مبني على السكون'},
+      'عن': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للمجاوزة', 'build': 'مبني على السكون'},
+      'ب': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للإلصاق', 'build': 'مبني على الكسر'},
+      'ل': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للملك أو التعليل', 'build': 'مبني على الكسر'},
+      'ك': {'type': 'حرف', 'category': 'حرف جر', 'irab': 'حرف جر للتشبيه', 'build': 'مبني على الفتح'},
+      'الذي': {'type': 'اسم', 'category': 'اسم موصول', 'irab': 'اسم موصول للمفرد المذكر', 'build': 'مبني على السكون'},
+      'التي': {'type': 'اسم', 'category': 'اسم موصول', 'irab': 'اسم موصول للمفردة المؤنثة', 'build': 'مبني على السكون'},
+      'الذين': {'type': 'اسم', 'category': 'اسم موصول', 'irab': 'اسم موصول لجمع المذكر', 'build': 'مبني على الفتح'},
+      'هذا': {'type': 'اسم', 'category': 'اسم إشارة', 'irab': 'اسم إشارة للمفرد المذكر القريب', 'build': 'مبني على السكون'},
+      'هذه': {'type': 'اسم', 'category': 'اسم إشارة', 'irab': 'اسم إشارة للمفردة المؤنثة القريبة', 'build': 'مبني على الكسر'},
+      'ذلك': {'type': 'اسم', 'category': 'اسم إشارة', 'irab': 'اسم إشارة للمفرد المذكر البعيد', 'build': 'مبني على الفتح'},
+      'تلك': {'type': 'اسم', 'category': 'اسم إشارة', 'irab': 'اسم إشارة للمفردة المؤنثة البعيدة', 'build': 'مبني على الفتح'},
+      'هؤلاء': {'type': 'اسم', 'category': 'اسم إشارة', 'irab': 'اسم إشارة لجمع العاقل القريب', 'build': 'مبني على الكسر'},
+      'أولئك': {'type': 'اسم', 'category': 'اسم إشارة', 'irab': 'اسم إشارة لجمع العاقل البعيد', 'build': 'مبني على الفتح'},
     };
-    return map[word] ?? 'حرف مبني لا محل له من الإعراب';
+    return particles[w];
   }
 
-  bool _isPreposition(String word) {
-    const preps = ['في', 'من', 'إلى', 'على', 'عن', 'مع', 'بين', 'فوق', 'تحت', 'عند', 'أمام', 'خلف', 'حول', 'دون', 'منذ', 'خلال'];
-    return preps.contains(word);
+  Map<String, String>? _checkPronouns(String w, int pos) {
+    final pronouns = <String, Map<String, String>>{
+      'هو': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل للغائب المفرد المذكر', 'build': 'مبني على الفتح في محل ${pos == 0 ? "رفع مبتدأ" : "رفع أو نصب"}'},
+      'هي': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل للغائبة المفردة المؤنثة', 'build': 'مبني على الفتح'},
+      'هم': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل لجمع الغائبين المذكر', 'build': 'مبني على السكون'},
+      'هن': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل لجمع الغائبات المؤنث', 'build': 'مبني على الفتح'},
+      'أنت': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل للمخاطب المفرد المذكر', 'build': 'مبني على الفتح'},
+      'أنتم': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل لجمع المخاطبين', 'build': 'مبني على السكون'},
+      'أنا': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل للمتكلم المفرد', 'build': 'مبني على السكون'},
+      'نحن': {'type': 'ضمير', 'category': 'ضمير منفصل', 'irab': 'ضمير منفصل للمتكلمين', 'build': 'مبني على الضم'},
+    };
+    final result = pronouns[w];
+    if (result != null) return result;
+    return null;
   }
 
-  bool _isConjunction(String word) {
-    const conjs = ['و', 'ف', 'أو', 'أم'];
-    return conjs.contains(word);
-  }
-
-  bool _isPronoun(String word) {
-    const pronouns = ['هو', 'هي', 'هم', 'هن', 'أنت', 'أنتم', 'أنا', 'نحن', 'هما', 'أنتما', 'أنتن'];
-    return pronouns.contains(word);
-  }
-
-  String _getPronounIrab(String word, int position) {
-    return 'ضمير منفصل مبني في محل ${position == 0 ? "رفع مبتدأ" : "رفع أو نصب"}';
-  }
-
-  bool _isDemonstrativePronoun(String word) {
-    const demos = ['هذا', 'هذه', 'هؤلاء', 'ذلك', 'تلك', 'أولئك', 'هذان', 'هاتان'];
-    return demos.contains(word);
-  }
-
-  bool _isRelativePronoun(String word) {
-    const rels = ['الذي', 'التي', 'الذين', 'اللاتي', 'اللائي', 'اللتان', 'اللذان', 'من', 'ما'];
-    return rels.contains(word);
-  }
-
-  bool _looksLikeVerb(String word) {
-    if (word.length < 2) return false;
+  bool _isVerb(String w) {
+    if (w.length < 2) return false;
     // Past tense patterns
-    if (word.endsWith('وا') || word.endsWith('تم') || word.endsWith('نا')) return true;
-    // Present tense prefixes
-    if (word.startsWith('ي') || word.startsWith('ت') || word.startsWith('ن') || word.startsWith('أ')) {
-      if (word.length > 3) return true;
-    }
+    if (w.endsWith('وا') || w.endsWith('تم') || w.endsWith('نا') || w.endsWith('تن')) return true;
+    // Prefixes indicating present tense
+    if ((w.startsWith('ي') || w.startsWith('ت') || w.startsWith('ن') || w.startsWith('أ')) && w.length > 3) return true;
     // Imperative
-    if (word.startsWith('ا') && word.length > 3) return true;
+    if (w.startsWith('ا') && w.length > 3) return true;
     return false;
   }
 
-  String _getVerbIrab(String baseWord, String fullWord, int position) {
-    if (baseWord.endsWith('وا') || baseWord.endsWith('تم') || baseWord.endsWith('نا') || baseWord.endsWith('ت')) {
-      return 'فعل ماضٍ مبني على ${_getPastVerbBuild(baseWord)}';
+  Map<String, String> _analyzeVerb(String clean, String full, int pos) {
+    String tense, form, sign, note = '';
+
+    if (clean.endsWith('وا') || clean.endsWith('تم') || clean.endsWith('نا') || clean.endsWith('ت')) {
+      tense = 'ماضٍ';
+      if (clean.endsWith('وا')) {
+        form = 'مبني على الضم لاتصاله بواو الجماعة';
+        sign = 'الضمة';
+      } else if (clean.endsWith('تم')) {
+        form = 'مبني على السكون لاتصاله بتاء الفاعل المتحركة';
+        sign = 'السكون';
+      } else if (clean.endsWith('نا')) {
+        form = 'مبني على السكون لاتصاله بنا الفاعلين';
+        sign = 'السكون';
+      } else {
+        form = 'مبني على السكون لاتصاله بتاء التأنيث الساكنة';
+        sign = 'السكون';
+      }
+    } else if (clean.startsWith('ا') && clean.length > 3) {
+      tense = 'أمر';
+      form = 'مبني على السكون';
+      sign = 'السكون';
+      note = 'فعل الأمر مبني دائماً';
+    } else {
+      tense = 'مضارع';
+      // Determine the mood from diacritics
+      if (full.endsWith('\u064E') || full.endsWith('\u064F')) {
+        form = 'مرفوع بالضمة الظاهرة على آخره';
+        sign = 'الضمة';
+        note = 'الفعل المضارع مرفوع إذا لم يسبقه ناصب أو جازم';
+      } else if (full.endsWith('\u064E\u0646') || full.endsWith('\u064F\u0646')) {
+        form = 'مرفوع وعلامة رفعه ثبوت النون لأنه من الأفعال الخمسة';
+        sign = 'ثبوت النون';
+        note = 'الأفعال الخمسة ترفع بثبوت النون';
+      } else {
+        form = 'مرفوع بالضمة الظاهرة أو المقدرة';
+        sign = 'الضمة';
+      }
     }
-    // Present tense
-    if (baseWord.startsWith('ي') || baseWord.startsWith('ت') || baseWord.startsWith('ن') || baseWord.startsWith('أ')) {
-      return 'فعل مضارع مرفوع وعلامة رفعه الضمة الظاهرة على آخره';
-    }
-    return 'فعل مبني';
+
+    return {
+      'type': 'فعل',
+      'category': 'فعل $tense',
+      'irab': 'فعل $tense $form',
+      'build': 'علامة إعرابه: $sign',
+      if (note.isNotEmpty) 'note': note,
+    };
   }
 
-  String _getPastVerbBuild(String word) {
-    if (word.endsWith('وا')) return 'الضم لاتصاله بواو الجماعة';
-    if (word.endsWith('تم')) return 'السكون لاتصاله بتاء الفاعل';
-    if (word.endsWith('نا')) return 'السكون لاتصاله بـ(نا) الفاعلين';
-    if (word.endsWith('ت')) return 'السكون لاتصاله بتاء التأنيث الساكنة';
-    return 'الفتح الظاهر على آخره';
-  }
+  Map<String, String> _analyzeNoun(String clean, String full, int pos, int total) {
+    final isDefinite = clean.startsWith('ال') || clean.startsWith('لل');
+    final isTanwin = full.contains('\u064C') || full.contains('\u064B') || full.contains('\u064D');
+    final isMajroor = full.endsWith('\u0650') || full.endsWith('\u0650\u0646');
+    final isMansub = full.endsWith('\u064E') || full.endsWith('\u064E\u0646');
+    final isMarfu = full.endsWith('\u064F') || full.endsWith('\u064F\u0646');
 
-  String _getNounIrab(String baseWord, String fullWord, int position, int total) {
-    // Check for definite article
-    final isDefinite = baseWord.startsWith('ال') || baseWord.startsWith('لل');
+    String position, sign, note = '';
 
-    if (position == 0) {
-      return 'اسم ${isDefinite ? "معرفة" : ""} مرفوع وعلامة رفعه الضمة الظاهرة على آخره${isDefinite ? " (مبتدأ)" : ""}';
+    if (pos == 0) {
+      position = 'مرفوع (مبتدأ أو فاعل)';
+      sign = isTanwin ? 'الضمة المنونة' : 'الضمة الظاهرة';
+      note = 'الاسم في أول الجملة الاسمية يكون مبتدأ مرفوعاً';
+    } else if (isMajroor) {
+      position = 'مجرور';
+      sign = isDefinite ? 'الكسرة الظاهرة' : (isTanwin ? 'الكسرة المنونة' : 'الكسرة');
+      note = 'الجر يكون بعد حرف الجر أو بالإضافة';
+    } else if (isMansub) {
+      position = 'منصوب';
+      sign = isDefinite ? 'الفتحة الظاهرة' : (isTanwin ? 'الفتحة المنونة' : 'الفتحة');
+    } else if (isMarfu) {
+      position = 'مرفوع';
+      sign = isDefinite ? 'الضمة الظاهرة' : (isTanwin ? 'الضمة المنونة' : 'الضمة');
+    } else {
+      position = pos <= 1 ? 'مرفوع' : 'يحدد محله حسب السياق';
+      sign = 'علامة إعرابه حسب موضعه';
     }
-    if (position == total - 1) {
-      return 'اسم ${isDefinite ? "معرفة" : ""} مرفوع أو مجرور حسب موقعه من الجملة';
+
+    final definiteness = isDefinite ? 'معرفة بأل التعريف' : (isTanwin ? 'نكرة منونة' : 'معرفة');
+
+    return {
+      'type': 'اسم',
+      'category': 'اسم $definiteness',
+      'irab': 'اسم $position، وعلامة إعرابه $sign',
+      'build': 'معرب، علامة إعرابه $sign',
+      if (note.isNotEmpty) 'note': note,
+    };
+  }
+
+  void _shareIrab(int ayahNum) {
+    final irabList = _irabCache[ayahNum] ?? [];
+    final ayah = widget.ayahs.where((a) => a.numberInSurah == ayahNum).firstOrNull;
+    final text = StringBuffer();
+    text.writeln('📝 إعراب الآية $ayahNum من سورة ${widget.surah.nameArabic}');
+    text.writeln();
+    if (ayah != null) text.writeln('﴿ ${ayah.text} ﴾\n');
+    for (final w in irabList) {
+      text.writeln('${w.word}: ${w.irabText}');
     }
-    return 'اسم ${isDefinite ? "معرفة بأل" : ""} ${_guessCase(position)} حسب موقعه من الإعراب';
-  }
-
-  String _guessCase(int position) {
-    if (position <= 1) return 'مرفوع';
-    return 'منصوب أو مجرور';
-  }
-
-  String _getHaraka(String word) {
-    if (word.contains('\u064E')) return 'الفتح';
-    if (word.contains('\u064F')) return 'الضم';
-    if (word.contains('\u0650')) return 'الكسر';
-    return 'السكون';
+    text.writeln('\n— من تطبيق نور القرآن');
+    SharePlus.instance.share(ShareParams(text: text.toString()));
   }
 
   @override
@@ -1048,17 +1325,15 @@ class _IrabTabState extends State<_IrabTab>
       return const Center(child: Text('لا توجد آيات'));
     }
 
-    final currentAyah = _selectedAyahIndex >= 0 &&
-            _selectedAyahIndex < widget.ayahs.length
-        ? widget.ayahs[_selectedAyahIndex]
-        : widget.ayahs.first;
-    final irabText = _irabCache[currentAyah.numberInSurah];
+    final currentAyah = widget.ayahs[_selectedAyahIndex.clamp(0, widget.ayahs.length - 1)];
+    final irabList = _irabCache[currentAyah.numberInSurah] ?? [];
 
     return Column(
       children: [
-        // Ayah selector
+        // ---- Ayah selector ----
         Container(
-          height: 60,
+          height: 58,
+          color: isDark ? const Color(0xFF1C2A36) : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
@@ -1068,21 +1343,16 @@ class _IrabTabState extends State<_IrabTab>
               final ayah = widget.ayahs[index];
               final isSelected = index == _selectedAyahIndex;
               return GestureDetector(
-                onTap: () => _loadIrab(ayah.numberInSurah),
-                child: Container(
-                  width: 44,
+                onTap: () => _loadIrab(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 42,
                   margin: const EdgeInsets.symmetric(horizontal: 3),
                   decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? const LinearGradient(
-                            colors: [Color(0xFF7B1FA2), Color(0xFF9C27B0)],
-                          )
-                        : null,
-                    color: isSelected
-                        ? null
-                        : (isDark
-                            ? theme.colorScheme.surfaceContainerHighest
-                            : Colors.grey[200]),
+                    gradient: isSelected ? const LinearGradient(
+                      colors: [Color(0xFF6A1B9A), Color(0xFF9C27B0)],
+                    ) : null,
+                    color: isSelected ? null : (isDark ? const Color(0xFF2A3A46) : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -1090,8 +1360,8 @@ class _IrabTabState extends State<_IrabTab>
                       '${ayah.numberInSurah}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: isSelected ? Colors.white : null,
+                        fontSize: 13,
+                        color: isSelected ? Colors.white : theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -1100,15 +1370,16 @@ class _IrabTabState extends State<_IrabTab>
             },
           ),
         ),
-        // Header
+        // ---- Header ----
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.purple.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: Colors.purple.withValues(alpha: 0.2)),
+            gradient: LinearGradient(
+              colors: [Colors.purple.withValues(alpha: 0.12), Colors.purple.withValues(alpha: 0.04)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
@@ -1118,81 +1389,80 @@ class _IrabTabState extends State<_IrabTab>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'الإعراب التفصيلي',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.purple,
-                      ),
-                    ),
-                    Text(
-                      'إعراب مفردات الآية مع بيان الموقع الإعرابي لكل كلمة',
-                      style: TextStyle(fontSize: 10, color: Colors.grey),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text('الإعراب التفصيلي الحديث',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.purple)),
+                    Text('وفق منهج الإعراب العربي الحديث',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
                   ],
+                ),
+              ),
+              // Toggle view
+              GestureDetector(
+                onTap: () => setState(() => _showWordView = !_showWordView),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_showWordView ? Icons.view_list : Icons.grid_view,
+                          size: 14, color: Colors.purple),
+                      const SizedBox(width: 4),
+                      Text(_showWordView ? 'عرض بطاقي' : 'عرض قائمة',
+                          style: const TextStyle(fontSize: 11, color: Colors.purple)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _shareIrab(currentAyah.numberInSurah),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.share, size: 14, color: Colors.purple),
                 ),
               ),
             ],
           ),
         ),
-        // Content
+        // ---- Content ----
         Expanded(
           child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.purple))
+              ? const Center(child: CircularProgressIndicator(color: Colors.purple))
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 32),
                   children: [
-                    // Ayah text
+                    // Ayah text display
                     Container(
+                      margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            Colors.purple.withValues(alpha: 0.05),
-                            Colors.purple.withValues(alpha: 0.02),
-                          ],
+                          colors: [Colors.purple.withValues(alpha: 0.06), Colors.purple.withValues(alpha: 0.02)],
                         ),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color:
-                                Colors.purple.withValues(alpha: 0.2)),
+                        border: Border.all(color: Colors.purple.withValues(alpha: 0.15)),
                       ),
                       child: Column(
                         children: [
                           Row(
                             children: [
                               Container(
-                                width: 36,
-                                height: 36,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF7B1FA2),
-                                      Color(0xFF9C27B0)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
+                                  gradient: const LinearGradient(colors: [Color(0xFF6A1B9A), Color(0xFF9C27B0)]),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    '${currentAyah.numberInSurah}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'الآية ${currentAyah.numberInSurah}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.purple,
+                                child: Text(
+                                  'الآية ${currentAyah.numberInSurah}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
@@ -1200,37 +1470,23 @@ class _IrabTabState extends State<_IrabTab>
                           const SizedBox(height: 12),
                           Text(
                             currentAyah.text,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              height: 2.2,
-                              color: Color(0xFF059669),
-                            ),
+                            style: const TextStyle(fontSize: 22, height: 2.2, color: Color(0xFF6A1B9A)),
                             textAlign: TextAlign.center,
                             textDirection: TextDirection.rtl,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
                     // I'rab content
-                    if (irabText != null)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? theme.colorScheme.surfaceContainerHighest
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: _buildIrabContent(irabText, theme),
-                      ),
+                    if (irabList.isEmpty)
+                      const Center(child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text('لم يتم تحميل الإعراب بعد', style: TextStyle(color: Colors.grey)),
+                      ))
+                    else
+                      _showWordView
+                          ? _buildWordCards(irabList, theme, isDark)
+                          : _buildListView(irabList, theme, isDark),
                   ],
                 ),
         ),
@@ -1238,78 +1494,221 @@ class _IrabTabState extends State<_IrabTab>
     );
   }
 
-  Widget _buildIrabContent(String irabText, ThemeData theme) {
-    final lines = irabText.split('\n');
-    final widgets = <Widget>[];
-    bool isWord = true;
+  Widget _buildWordCards(List<_WordIrab> irabList, ThemeData theme, bool isDark) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: irabList.map((w) => _WordIrabCard(wordIrab: w, isDark: isDark)).toList(),
+    );
+  }
 
-    for (final line in lines) {
-      if (line.trim().isEmpty) {
-        isWord = true;
-        continue;
-      }
-      if (isWord && line.contains(':')) {
-        final word = line.replaceAll(':', '').trim();
-        widgets.add(
+  Widget _buildListView(List<_WordIrab> irabList, ThemeData theme, bool isDark) {
+    return Column(
+      children: irabList.map((w) => _IrabListItem(wordIrab: w, isDark: isDark, theme: theme)).toList(),
+    );
+  }
+}
+
+class _WordIrab {
+  final String word;
+  final String clean;
+  final String wordType;
+  final String category;
+  final String irab;
+  final String buildNote;
+  final String? note;
+
+  String get irabText => irab;
+
+  _WordIrab({
+    required this.word,
+    required this.clean,
+    required this.wordType,
+    required this.category,
+    required this.irab,
+    required this.buildNote,
+    this.note,
+  });
+
+  factory _WordIrab.fromMap(String full, String clean, Map<String, String> map) {
+    return _WordIrab(
+      word: full,
+      clean: clean,
+      wordType: map['type'] ?? 'اسم',
+      category: map['category'] ?? '',
+      irab: map['irab'] ?? '',
+      buildNote: map['build'] ?? '',
+      note: map['note'],
+    );
+  }
+}
+
+class _WordIrabCard extends StatelessWidget {
+  final _WordIrab wordIrab;
+  final bool isDark;
+  const _WordIrabCard({required this.wordIrab, required this.isDark});
+
+  Color get _typeColor {
+    switch (wordIrab.wordType) {
+      case 'فعل': return const Color(0xFF1565C0);
+      case 'حرف': return const Color(0xFF6A1B9A);
+      case 'ضمير': return const Color(0xFF00695C);
+      case 'ظرف': return const Color(0xFFE65100);
+      case 'أداة': return const Color(0xFF558B2F);
+      default: return const Color(0xFF37474F);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 120, maxWidth: 200),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2A36) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _typeColor.withValues(alpha: 0.3)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Word
+          Text(
+            wordIrab.word,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: _typeColor,
+            ),
+            textDirection: TextDirection.rtl,
+          ),
+          const SizedBox(height: 4),
+          // Category badge
           Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.purple.withValues(alpha: 0.15),
-                  Colors.purple.withValues(alpha: 0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
+              color: _typeColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              word,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.purple,
-              ),
-              textDirection: TextDirection.rtl,
+              wordIrab.category,
+              style: TextStyle(fontSize: 10, color: _typeColor, fontWeight: FontWeight.w600),
             ),
           ),
-        );
-        isWord = false;
-      } else {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(right: 16, bottom: 4),
-            child: Row(
+          const SizedBox(height: 6),
+          // I'rab
+          Text(
+            wordIrab.irab,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.6,
+              color: isDark ? Colors.white70 : Colors.grey[800],
+            ),
+            textDirection: TextDirection.rtl,
+          ),
+          if (wordIrab.note != null) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                wordIrab.note!,
+                style: const TextStyle(fontSize: 10, color: Colors.orange),
+                textDirection: TextDirection.rtl,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _IrabListItem extends StatelessWidget {
+  final _WordIrab wordIrab;
+  final bool isDark;
+  final ThemeData theme;
+  const _IrabListItem({required this.wordIrab, required this.isDark, required this.theme});
+
+  Color get _typeColor {
+    switch (wordIrab.wordType) {
+      case 'فعل': return const Color(0xFF1565C0);
+      case 'حرف': return const Color(0xFF6A1B9A);
+      case 'ضمير': return const Color(0xFF00695C);
+      case 'ظرف': return const Color(0xFFE65100);
+      default: return const Color(0xFF37474F);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2A36) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(right: BorderSide(color: _typeColor, width: 4)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Icon(Icons.arrow_left,
-                      size: 16, color: Colors.purple),
-                ),
-                Expanded(
-                  child: Text(
-                    line.trim(),
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.8,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.85),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _typeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(wordIrab.category,
+                          style: TextStyle(fontSize: 10, color: _typeColor, fontWeight: FontWeight.bold)),
                     ),
-                    textDirection: TextDirection.rtl,
-                  ),
+                  ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  wordIrab.irab,
+                  style: TextStyle(fontSize: 13, height: 1.7, color: theme.colorScheme.onSurface),
+                  textDirection: TextDirection.rtl,
+                ),
+                if (wordIrab.buildNote.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(wordIrab.buildNote,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        textDirection: TextDirection.rtl),
+                  ),
+                if (wordIrab.note != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('💡 ${wordIrab.note}',
+                        style: const TextStyle(fontSize: 11, color: Colors.orange),
+                        textDirection: TextDirection.rtl),
+                  ),
               ],
             ),
           ),
-        );
-        isWord = true;
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: widgets,
+          const SizedBox(width: 12),
+          Text(
+            wordIrab.word,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _typeColor),
+            textDirection: TextDirection.rtl,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1324,52 +1723,53 @@ class _GharibTab extends StatefulWidget {
   State<_GharibTab> createState() => _GharibTabState();
 }
 
-class _GharibTabState extends State<_GharibTab>
-    with AutomaticKeepAliveClientMixin {
+class _GharibTabState extends State<_GharibTab> with AutomaticKeepAliveClientMixin {
   int _selectedAyahIndex = 0;
 
   @override
   bool get wantKeepAlive => true;
 
-  // Comprehensive dictionary of difficult Quranic words
   static const Map<String, Map<String, String>> _gharibDictionary = {
-    'ٱلۡحَمۡدُ': {'meaning': 'الثناء والشكر', 'root': 'ح م د', 'detail': 'الحمد هو الثناء على الله بصفات الكمال وأفعال الجمال، ويختلف عن الشكر في أنه يكون على النعمة وغيرها'},
-    'ٱلرَّحۡمَـٰنِ': {'meaning': 'ذو الرحمة الواسعة', 'root': 'ر ح م', 'detail': 'صفة مبالغة تدل على سعة الرحمة التي تشمل جميع الخلق في الدنيا'},
-    'ٱلرَّحِيمِ': {'meaning': 'ذو الرحمة الخاصة', 'root': 'ر ح م', 'detail': 'صفة تدل على الرحمة الخاصة بالمؤمنين في الآخرة'},
-    'ٱلۡعَـٰلَمِينَ': {'meaning': 'جميع المخلوقات', 'root': 'ع ل م', 'detail': 'جمع عالَم، وهو كل ما سوى الله تعالى من الإنس والجن والملائكة وسائر المخلوقات'},
-    'مَـٰلِكِ': {'meaning': 'المتصرف المالك', 'root': 'م ل ك', 'detail': 'صاحب الملك والسلطان المطلق'},
-    'ٱلدِّينِ': {'meaning': 'يوم الجزاء والحساب', 'root': 'د ي ن', 'detail': 'الدين هنا بمعنى الجزاء والحساب، أي يوم القيامة'},
-    'نَعۡبُدُ': {'meaning': 'نخضع ونتذلل', 'root': 'ع ب د', 'detail': 'العبادة هي غاية التذلل والخضوع لله مع غاية المحبة والتعظيم'},
-    'نَسۡتَعِينُ': {'meaning': 'نطلب العون والمساعدة', 'root': 'ع و ن', 'detail': 'الاستعانة هي طلب العون من الله في جميع الأمور'},
-    'ٱلصِّرَٰطَ': {'meaning': 'الطريق الواضح المستقيم', 'root': 'ص ر ط', 'detail': 'الطريق الواسع الواضح الذي لا اعوجاج فيه، وهو دين الإسلام'},
-    'ٱلۡمُسۡتَقِيمَ': {'meaning': 'المعتدل الذي لا عوج فيه', 'root': 'ق و م', 'detail': 'الطريق القويم الذي لا انحراف فيه يمينًا ولا شمالًا'},
-    'أَنۡعَمۡتَ': {'meaning': 'تفضلت بالنعمة', 'root': 'ن ع م', 'detail': 'الإنعام هو إسباغ النعم والفضل والهداية'},
-    'ٱلۡمَغۡضُوبِ': {'meaning': 'من نزل عليه الغضب', 'root': 'غ ض ب', 'detail': 'الذين عرفوا الحق وتركوه عن عمد كاليهود'},
-    'ٱلضَّآلِّينَ': {'meaning': 'التائهين عن الحق', 'root': 'ض ل ل', 'detail': 'الذين جهلوا الحق ولم يهتدوا إليه كالنصارى'},
-    'ذَٰلِكَ': {'meaning': 'اسم إشارة للبعيد', 'root': 'ذ ل ك', 'detail': 'يُستخدم للإشارة إلى شيء بعيد، وفيه تعظيم للمشار إليه'},
-    'ٱلۡكِتَٰبُ': {'meaning': 'القرآن الكريم', 'root': 'ك ت ب', 'detail': 'المراد به القرآن الكريم، سُمي كتابًا لأنه مكتوب في اللوح المحفوظ'},
-    'رَيۡبَ': {'meaning': 'شك', 'root': 'ر ي ب', 'detail': 'الريب هو الشك المُقلق الذي يصحبه قلق واضطراب'},
-    'ٱلۡمُتَّقِينَ': {'meaning': 'الذين يتقون الله', 'root': 'و ق ي', 'detail': 'الذين يجعلون بينهم وبين عذاب الله وقاية بفعل الطاعات وترك المعاصي'},
-    'ٱلۡغَيۡبِ': {'meaning': 'ما غاب عن الحواس', 'root': 'غ ي ب', 'detail': 'كل ما غاب عن إدراك الإنسان مما أخبر الله به من أمور الآخرة وغيرها'},
-    'يُنفِقُونَ': {'meaning': 'يبذلون من أموالهم', 'root': 'ن ف ق', 'detail': 'الإنفاق هو بذل المال في سبيل الله، ويشمل الزكاة والصدقات'},
-    'أُنزِلَ': {'meaning': 'نُزِّل من السماء', 'root': 'ن ز ل', 'detail': 'إنزال القرآن من اللوح المحفوظ إلى السماء الدنيا ثم إلى النبي'},
-    'يُوقِنُونَ': {'meaning': 'يعلمون علمًا جازمًا', 'root': 'ي ق ن', 'detail': 'اليقين هو العلم الجازم الذي لا يخالطه شك'},
-    'هُدًى': {'meaning': 'دلالة وإرشاد', 'root': 'ه د ي', 'detail': 'الهداية والبيان والإرشاد إلى طريق الحق'},
-    'ٱلۡمُفۡلِحُونَ': {'meaning': 'الفائزون الناجحون', 'root': 'ف ل ح', 'detail': 'الفلاح هو الفوز والظفر بالمطلوب والنجاة من المرهوب'},
-    'كَفَرُواْ': {'meaning': 'جحدوا وأنكروا', 'root': 'ك ف ر', 'detail': 'الكفر هو الجحود والإنكار وستر الحق بعد معرفته'},
-    'غِشَٰوَةٌ': {'meaning': 'غطاء وحجاب', 'root': 'غ ش و', 'detail': 'الغشاوة هي الغطاء الذي يحجب البصر والبصيرة'},
-    'خَٰلِدُونَ': {'meaning': 'باقون دائمون', 'root': 'خ ل د', 'detail': 'الخلود هو البقاء الأبدي الذي لا انتهاء له'},
-    'يُخَٰدِعُونَ': {'meaning': 'يحاولون الخداع', 'root': 'خ د ع', 'detail': 'المخادعة هي إظهار خلاف ما يُبطن لإيقاع الغير في الغفلة'},
-    'مَرَضٌ': {'meaning': 'علة وضعف', 'root': 'م ر ض', 'detail': 'المرض هنا مرض القلب بالشك والنفاق، وليس المرض الجسدي'},
-    'يُفۡسِدُواْ': {'meaning': 'يخربوا ويهلكوا', 'root': 'ف س د', 'detail': 'الإفساد هو إحداث الخلل والضرر في الأرض بالمعاصي والشرك'},
-    'سَفِيهٌ': {'meaning': 'ناقص العقل والرأي', 'root': 'س ف ه', 'detail': 'السفه هو خفة العقل ونقص الحكمة والرأي'},
-    'ٱسۡتَوَىٰ': {'meaning': 'ارتفع وعلا', 'root': 'س و ي', 'detail': 'الاستواء هو العلو والارتفاع، واستواء الله على العرش يليق بجلاله'},
-    'خَلِيفَةً': {'meaning': 'من يخلف غيره', 'root': 'خ ل ف', 'detail': 'الخلافة في الأرض: النيابة عن الله في تنفيذ أحكامه'},
-    'بَقَرَةً': {'meaning': 'أنثى البقر', 'root': 'ب ق ر', 'detail': 'البقرة واحدة البقر، سُميت السورة بها لقصة بقرة بني إسرائيل'},
-    'فَٱدَّٰرَءۡتُمۡ': {'meaning': 'تدافعتم وتنازعتم', 'root': 'د ر أ', 'detail': 'التدارؤ هو التدافع، أي دفع كل فريق القتل عن نفسه'},
-    'صَلۡدًا': {'meaning': 'أملس لا ينبت', 'root': 'ص ل د', 'detail': 'الحجر الأملس الذي لا تراب عليه ولا نبات'},
-    'وَابِلٌ': {'meaning': 'مطر شديد غزير', 'root': 'و ب ل', 'detail': 'الوابل هو المطر الشديد الغزير ذو القطرات الكبيرة'},
-    'طَلٌّ': {'meaning': 'مطر خفيف', 'root': 'ط ل ل', 'detail': 'الطل هو المطر الخفيف اللطيف الذي لا يُرى له قطرات'},
+    'ٱلۡحَمۡدُ': {'meaning': 'الثناء والشكر', 'root': 'ح م د', 'detail': 'الحمد: الثناء على الله بصفات الكمال وأفعال الجمال، يختلف عن الشكر إذ يكون على النعمة وغيرها'},
+    'ٱلرَّحۡمَـٰنِ': {'meaning': 'ذو الرحمة الواسعة', 'root': 'ر ح م', 'detail': 'صفة مشبهة مبالغة تدل على سعة الرحمة، وهي رحمة الدنيا التي تعم المؤمن والكافر'},
+    'ٱلرَّحِيمِ': {'meaning': 'ذو الرحمة الخاصة', 'root': 'ر ح م', 'detail': 'صفة مشبهة تدل على الرحمة الخاصة بالمؤمنين في الآخرة، وهي أخص من الرحمن'},
+    'ٱلۡعَـٰلَمِينَ': {'meaning': 'جميع المخلوقات', 'root': 'ع ل م', 'detail': 'جمع عالَم بفتح اللام، وهو كل ما سوى الله: الإنس والجن والملائكة وسائر المخلوقات'},
+    'مَـٰلِكِ': {'meaning': 'المتصرف المالك', 'root': 'م ل ك', 'detail': 'صاحب الملك والسلطان المطلق على الخلائق يوم القيامة، وقرئ (مَلِك) أي السلطان الحاكم'},
+    'ٱلدِّينِ': {'meaning': 'يوم الجزاء والحساب', 'root': 'د ي ن', 'detail': 'الدين هنا بمعنى الجزاء والحساب والمحاسبة، يوم يدين الله فيه الخلق بأعمالهم'},
+    'نَعۡبُدُ': {'meaning': 'نتذلل ونخضع', 'root': 'ع ب د', 'detail': 'العبادة: غاية التذلل لله مع غاية المحبة والتعظيم، وهي تشمل جميع ما يحبه الله ويرضاه'},
+    'نَسۡتَعِينُ': {'meaning': 'نطلب العون', 'root': 'ع و ن', 'detail': 'الاستعانة: طلب المعونة من الله في جميع الأمور الدينية والدنيوية'},
+    'ٱلصِّرَٰطَ': {'meaning': 'الطريق الواسع المستقيم', 'root': 'ص ر ط', 'detail': 'الصراط: الطريق الواضح الواسع، مستعار لدين الإسلام الذي لا عوج فيه'},
+    'ٱلۡمُسۡتَقِيمَ': {'meaning': 'المعتدل الذي لا عوج فيه', 'root': 'ق و م', 'detail': 'اسم فاعل من استقام: الطريق القويم الذي لا انحراف فيه يمينًا ولا شمالًا'},
+    'أَنۡعَمۡتَ': {'meaning': 'تفضلت بالنعمة والهداية', 'root': 'ن ع م', 'detail': 'الإنعام: إسباغ النعم والخيرات، والمنعم عليهم هم الأنبياء والصديقون والشهداء والصالحون'},
+    'ٱلۡمَغۡضُوبِ': {'meaning': 'من نزل عليه الغضب الإلهي', 'root': 'غ ض ب', 'detail': 'المغضوب عليهم: الذين عرفوا الحق وتركوه عمدًا، وهم اليهود وأمثالهم'},
+    'ٱلضَّآلِّينَ': {'meaning': 'الحائدين عن الحق', 'root': 'ض ل ل', 'detail': 'الضالون: الذين جهلوا الحق ولم يهتدوا إليه، وهم النصارى وأمثالهم'},
+    'ذَٰلِكَ': {'meaning': 'اسم إشارة للبعيد التعظيم', 'root': 'ذ ل ك', 'detail': 'اسم إشارة للمفرد المذكر البعيد، استعمل للقريب للتعظيم وإعلاء شأن القرآن'},
+    'ٱلۡكِتَٰبُ': {'meaning': 'القرآن الكريم', 'root': 'ك ت ب', 'detail': 'الكتاب: مصدر بمعنى المكتوب، سُمي القرآن كتابًا لكتابته في اللوح المحفوظ وصحائف الوحي'},
+    'رَيۡبَ': {'meaning': 'شك مع قلق واضطراب', 'root': 'ر ي ب', 'detail': 'الريب: أخص من الشك، يتضمن الشك مع الاتهام والقلق، لا يجوز تقدير حرف الجر'},
+    'ٱلۡمُتَّقِينَ': {'meaning': 'الذين اتقوا الله', 'root': 'و ق ي', 'detail': 'التقوى: جعل وقاية بين العبد وعذاب الله بفعل الطاعات واجتناب المحرمات'},
+    'ٱلۡغَيۡبِ': {'meaning': 'ما غاب عن الحواس والإدراك', 'root': 'غ ي ب', 'detail': 'الغيب: كل ما غاب عن إدراك الإنسان مما أخبر الله به: الآخرة، القدر، الروح، وغيرها'},
+    'يُنفِقُونَ': {'meaning': 'يبذلون أموالهم في وجوه الخير', 'root': 'ن ف ق', 'detail': 'الإنفاق: بذل المال والجهد في سبيل الله، يشمل الزكاة والصدقة والنفقة على العيال'},
+    'أُنزِلَ': {'meaning': 'أُهبط ونُزِّل من العلو', 'root': 'ن ز ل', 'detail': 'الإنزال: إهباط الشيء من العلو، والقرآن نُزِّل منجمًا في ثلاث وعشرين سنة'},
+    'يُوقِنُونَ': {'meaning': 'يعلمون علمًا جازمًا لا شك فيه', 'root': 'ي ق ن', 'detail': 'اليقين: العلم الجازم المطابق للواقع الذي لا يخالطه شك ولا ظن'},
+    'هُدًى': {'meaning': 'دلالة وإرشاد وبيان', 'root': 'ه د ي', 'detail': 'الهدى: الدلالة الموصلة إلى الحق، وهو نوعان: هدى بيان وإرشاد، وهدى توفيق وتسديد'},
+    'ٱلۡمُفۡلِحُونَ': {'meaning': 'الفائزون الناجون', 'root': 'ف ل ح', 'detail': 'الفلاح: حصول الخير والفوز، ومنه فلاح الأرض لأنه يشقها ليستخرج خيرها'},
+    'كَفَرُواْ': {'meaning': 'جحدوا وستروا الحق', 'root': 'ك ف ر', 'detail': 'الكفر: الجحود والإنكار وستر الحق بعد وضوحه. الكافر: من يستر الحق كالزارع يستر الحبة'},
+    'غِشَٰوَةٌ': {'meaning': 'غطاء وستار يحجب الإبصار', 'root': 'غ ش و', 'detail': 'الغشاوة: الغطاء المحيط بالشيء من جميع جوانبه، تصوير لحال الكافر المحجوب عن الهداية'},
+    'خَٰلِدُونَ': {'meaning': 'مقيمون إلى الأبد', 'root': 'خ ل د', 'detail': 'الخلود: الإقامة الدائمة الأبدية التي لا انقطاع لها، من خَلَد: ثبت وأقام'},
+    'يُخَٰدِعُونَ': {'meaning': 'يتظاهرون بالإيمان إيقاعًا', 'root': 'خ د ع', 'detail': 'المخادعة: المراوغة والتمويه، إظهار خلاف ما يُبطن، ولكن الله يعامل المنافق بمثل فعله'},
+    'مَرَضٌ': {'meaning': 'علة وضعف في القلب', 'root': 'م ر ض', 'detail': 'المرض هنا مرض القلب: الشك والنفاق والرياء، وهو أشد خطرًا من مرض الجسد'},
+    'يُفۡسِدُواْ': {'meaning': 'يُخربون ويُهلكون', 'root': 'ف س د', 'detail': 'الإفساد: إحداث الخلل والفساد في الأرض بالكفر والنفاق والمعاصي'},
+    'سَفِيهٌ': {'meaning': 'ناقص العقل والرأي', 'root': 'س ف ه', 'detail': 'السفه: خفة العقل وضعف الرأي، ضد الحلم، وأصله من ثوب سفيه: رقيق النسيج'},
+    'ٱسۡتَوَىٰ': {'meaning': 'علا وارتفع واستقر', 'root': 'س و ي', 'detail': 'الاستواء: العلو والارتفاع والاستقرار، استواء الله على العرش صفة ثابتة تليق بجلاله'},
+    'خَلِيفَةً': {'meaning': 'من يخلف غيره ويقوم مقامه', 'root': 'خ ل ف', 'detail': 'الخليفة: من يخلف غيره، وخلافة الإنسان في الأرض: القيام بالعمارة والاستخلاف الإلهي'},
+    'بَقَرَةً': {'meaning': 'أنثى البقر', 'root': 'ب ق ر', 'detail': 'البقرة: الأنثى من الثيران، سميت بذلك لأنها تبقر الأرض أي تشقها وتحرثها'},
+    'صَلۡدًا': {'meaning': 'حجر أملس صلب لا تراب عليه', 'root': 'ص ل د', 'detail': 'الصَّلد: الحجر الأملس الصلب الذي لا تراب عليه ولا ينبت، وهو مثل للرياء'},
+    'وَابِلٌ': {'meaning': 'مطر شديد غزير القطرات', 'root': 'و ب ل', 'detail': 'الوابل: المطر الشديد الغزير الكبير القطرات، ضد الطل، تمثيل للعمل الخالص المضاعف'},
+    'طَلٌّ': {'meaning': 'ندى ومطر خفيف دقيق', 'root': 'ط ل ل', 'detail': 'الطل: الندى الخفيف الدقيق الذي لا يُرى وقوعه، تمثيل للعمل المقبول وإن قل'},
+    'جَنَّةٌ': {'meaning': 'البستان كثير الأشجار', 'root': 'ج ن ن', 'detail': 'الجنة: البستان الكثير الأشجار المتكاثفة حتى تُجِنّ ما فيها. والجنة الآخروية: دار النعيم'},
+    'رَبَّنَا': {'meaning': 'يا خالقنا وسيدنا', 'root': 'ر ب ب', 'detail': 'الرب: المالك المتصرف الموجد والمربي، ولا يُستعمل وصفًا لغير الله إلا بإضافة'},
+    'تَوَفَّيۡتَنِي': {'meaning': 'قبضت روحي وأكملت أجلي', 'root': 'و ف ي', 'detail': 'التوفي: استيفاء الشيء وأخذه كاملًا، والموت استيفاء الله للأجل المحدد'},
+    'ٱلظَّـٰلِمِينَ': {'meaning': 'الواضعين الشيء في غير موضعه', 'root': 'ظ ل م', 'detail': 'الظلم: وضع الشيء في غير موضعه، وأعظمه الشرك بالله لأنه وضع العبادة في غير موضعها'},
   };
 
   List<Map<String, String>> _findGharibWords(String ayahText) {
@@ -1377,31 +1777,46 @@ class _GharibTabState extends State<_GharibTab>
     final words = ayahText.split(RegExp(r'\s+'));
 
     for (final word in words) {
-      // Check exact match
       if (_gharibDictionary.containsKey(word)) {
-        results.add({
-          'word': word,
-          ..._gharibDictionary[word]!,
-        });
+        if (!results.any((r) => r['word'] == word)) {
+          results.add({'word': word, ..._gharibDictionary[word]!});
+        }
         continue;
       }
-
-      // Check partial match (for words with different diacritics)
-      final stripped = word.replaceAll(RegExp(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u0600-\u0605\u06DD]'), '');
+      final stripped = _stripDiacritics(word);
       for (final entry in _gharibDictionary.entries) {
-        final dictStripped = entry.key.replaceAll(RegExp(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u0600-\u0605\u06DD]'), '');
-        if (stripped == dictStripped || stripped.contains(dictStripped) || dictStripped.contains(stripped)) {
+        final dictStripped = _stripDiacritics(entry.key);
+        if (stripped == dictStripped || (stripped.length > 2 && dictStripped.contains(stripped))) {
           if (!results.any((r) => r['word'] == entry.key)) {
-            results.add({
-              'word': entry.key,
-              ...entry.value,
-            });
+            results.add({'word': entry.key, 'original': word, ...entry.value});
           }
         }
       }
     }
-
     return results;
+  }
+
+  String _stripDiacritics(String w) {
+    return w.replaceAll(RegExp(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u0600-\u0605\u06DD]'), '');
+  }
+
+  void _shareGharib(int ayahNum) {
+    final ayah = widget.ayahs.where((a) => a.numberInSurah == ayahNum).firstOrNull;
+    if (ayah == null) return;
+    final words = _findGharibWords(ayah.text);
+    final text = StringBuffer();
+    text.writeln('📚 غريب القرآن - الآية $ayahNum من سورة ${widget.surah.nameArabic}');
+    text.writeln();
+    if (words.isEmpty) {
+      text.writeln('لا توجد كلمات غريبة في هذه الآية');
+    } else {
+      for (final w in words) {
+        text.writeln('• ${w['word']}: ${w['meaning']}');
+        if (w['root'] != null) text.writeln('  الجذر: ${w['root']}');
+      }
+    }
+    text.writeln('\n— من تطبيق نور القرآن');
+    SharePlus.instance.share(ShareParams(text: text.toString()));
   }
 
   @override
@@ -1410,21 +1825,17 @@ class _GharibTabState extends State<_GharibTab>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    if (widget.ayahs.isEmpty) {
-      return const Center(child: Text('لا توجد آيات'));
-    }
+    if (widget.ayahs.isEmpty) return const Center(child: Text('لا توجد آيات'));
 
-    final currentAyah = _selectedAyahIndex >= 0 &&
-            _selectedAyahIndex < widget.ayahs.length
-        ? widget.ayahs[_selectedAyahIndex]
-        : widget.ayahs.first;
+    final currentAyah = widget.ayahs[_selectedAyahIndex.clamp(0, widget.ayahs.length - 1)];
     final gharibWords = _findGharibWords(currentAyah.text);
 
     return Column(
       children: [
         // Ayah selector
         Container(
-          height: 60,
+          height: 58,
+          color: isDark ? const Color(0xFF1C2A36) : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
@@ -1435,29 +1846,23 @@ class _GharibTabState extends State<_GharibTab>
               final isSelected = index == _selectedAyahIndex;
               return GestureDetector(
                 onTap: () => setState(() => _selectedAyahIndex = index),
-                child: Container(
-                  width: 44,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 42,
                   margin: const EdgeInsets.symmetric(horizontal: 3),
                   decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? const LinearGradient(
-                            colors: [Color(0xFFE65100), Color(0xFFFF6D00)],
-                          )
-                        : null,
-                    color: isSelected
-                        ? null
-                        : (isDark
-                            ? theme.colorScheme.surfaceContainerHighest
-                            : Colors.grey[200]),
+                    gradient: isSelected ? const LinearGradient(
+                      colors: [Color(0xFFBF360C), Color(0xFFE64A19)],
+                    ) : null,
+                    color: isSelected ? null : (isDark ? const Color(0xFF2A3A46) : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
                       '${ayah.numberInSurah}',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: isSelected ? Colors.white : null,
+                        fontWeight: FontWeight.bold, fontSize: 13,
+                        color: isSelected ? Colors.white : theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -1468,37 +1873,40 @@ class _GharibTabState extends State<_GharibTab>
         ),
         // Header
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.orange.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: Colors.orange.withValues(alpha: 0.2)),
+            gradient: LinearGradient(colors: [
+              Colors.deepOrange.withValues(alpha: 0.1),
+              Colors.deepOrange.withValues(alpha: 0.03),
+            ]),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.2)),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.help_outline, color: Colors.deepOrange, size: 20),
-              SizedBox(width: 8),
-              Expanded(
+              const Icon(Icons.menu_book, color: Colors.deepOrange, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'غريب القرآن',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.deepOrange,
-                      ),
-                    ),
-                    Text(
-                      'مفردات القرآن الكريم - بيان معاني الكلمات الغريبة والصعبة',
-                      style: TextStyle(fontSize: 10, color: Colors.grey),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text('غريب القرآن الكريم',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepOrange)),
+                    Text('بيان معاني الكلمات الصعبة - مستوحى من مفردات الراغب',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
                   ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _shareGharib(currentAyah.numberInSurah),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.share, size: 14, color: Colors.deepOrange),
                 ),
               ),
             ],
@@ -1507,105 +1915,80 @@ class _GharibTabState extends State<_GharibTab>
         // Content
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 32),
             children: [
-              // Ayah text
+              // Ayah card
               Container(
+                margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.orange.withValues(alpha: 0.05),
-                      Colors.orange.withValues(alpha: 0.02),
-                    ],
-                  ),
+                  gradient: LinearGradient(colors: [
+                    Colors.deepOrange.withValues(alpha: 0.06),
+                    Colors.deepOrange.withValues(alpha: 0.02),
+                  ]),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.2)),
+                  border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.15)),
                 ),
                 child: Column(
                   children: [
                     Row(
                       children: [
                         Container(
-                          width: 36,
-                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFFE65100),
-                                Color(0xFFFF6D00)
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
+                            gradient: const LinearGradient(colors: [Color(0xFFBF360C), Color(0xFFE64A19)]),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Center(
-                            child: Text(
-                              '${currentAyah.numberInSurah}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          child: Text(
+                            'الآية ${currentAyah.numberInSurah}',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const Spacer(),
                         Text(
-                          'الآية ${currentAyah.numberInSurah}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepOrange,
-                          ),
+                          '${gharibWords.length} كلمة',
+                          style: TextStyle(fontSize: 12, color: gharibWords.isEmpty ? Colors.green : Colors.deepOrange),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Text(
                       currentAyah.text,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        height: 2.2,
-                        color: Color(0xFF059669),
-                      ),
+                      style: const TextStyle(fontSize: 22, height: 2.2, color: Color(0xFFBF360C)),
                       textAlign: TextAlign.center,
                       textDirection: TextDirection.rtl,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
               // Gharib words
               if (gharibWords.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? theme.colorScheme.surfaceContainerHighest
-                        : Colors.white,
+                    color: isDark ? const Color(0xFF1C2A36) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
                   ),
                   child: Column(
                     children: [
-                      Icon(Icons.check_circle_outline,
-                          size: 48,
-                          color: Colors.green.withValues(alpha: 0.5)),
+                      Container(
+                        width: 60, height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_circle_outline, size: 36, color: Colors.green),
+                      ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'لا توجد كلمات غريبة في هذه الآية',
-                        style: TextStyle(fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
+                      const Text('لا توجد كلمات غريبة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      const Text(
-                        'جميع كلمات هذه الآية واضحة المعنى',
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
+                      const Text('جميع كلمات هذه الآية واضحة المعنى', style: TextStyle(color: Colors.grey, fontSize: 13)),
                     ],
                   ),
                 )
               else
-                ...gharibWords.map((entry) => _buildGharibCard(
-                    entry, theme, isDark)),
+                ...gharibWords.map((entry) => _buildGharibCard(entry, theme, isDark)),
             ],
           ),
         ),
@@ -1613,77 +1996,54 @@ class _GharibTabState extends State<_GharibTab>
     );
   }
 
-  Widget _buildGharibCard(
-      Map<String, String> entry, ThemeData theme, bool isDark) {
+  Widget _buildGharibCard(Map<String, String> entry, ThemeData theme, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? theme.colorScheme.surfaceContainerHighest
-            : Colors.white,
+        color: isDark ? const Color(0xFF1C2A36) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Word header
+          // Header
           Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE65100), Color(0xFFFF6D00)],
-              ),
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(16),
-                topLeft: Radius.circular(16),
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [Color(0xFFBF360C), Color(0xFFE64A19)]),
+              borderRadius: BorderRadius.only(topRight: Radius.circular(16), topLeft: Radius.circular(16)),
             ),
             child: Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     entry['word'] ?? '',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                     textDirection: TextDirection.rtl,
                   ),
                 ),
                 const Spacer(),
                 if (entry['root'] != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'الجذر: ${entry['root']}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('الجذر', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      Text(
+                        entry['root']!,
+                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2),
                       ),
-                    ),
+                    ],
                   ),
               ],
             ),
           ),
-          // Meaning
+          // Meaning & detail
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1691,68 +2051,33 @@ class _GharibTabState extends State<_GharibTab>
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 4,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.deepOrange,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'المعنى:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.deepOrange,
+                    Container(width: 4, height: 20, decoration: BoxDecoration(color: Colors.deepOrange, borderRadius: BorderRadius.circular(2))),
+                    const SizedBox(width: 10),
+                    const Text('المعنى:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepOrange)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        entry['meaning'] ?? '',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                        textDirection: TextDirection.rtl,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  entry['meaning'] ?? '',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textDirection: TextDirection.rtl,
-                ),
                 if (entry['detail'] != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'التفصيل:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    entry['detail'] ?? '',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.8,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.8),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.1)),
                     ),
-                    textDirection: TextDirection.rtl,
+                    child: Text(
+                      entry['detail']!,
+                      style: TextStyle(fontSize: 13.5, height: 1.8, color: theme.colorScheme.onSurface.withValues(alpha: 0.85)),
+                      textDirection: TextDirection.rtl,
+                    ),
                   ),
                 ],
               ],
@@ -1761,5 +2086,292 @@ class _GharibTabState extends State<_GharibTab>
         ],
       ),
     );
+  }
+}
+
+/// =========== AYAH NAVIGATOR TAB ===========
+class _AyahNavigatorTab extends StatefulWidget {
+  final Surah surah;
+  final List<Ayah> ayahs;
+  final VoidCallback onNavigateToTafsir;
+  final VoidCallback onNavigateToIrab;
+
+  const _AyahNavigatorTab({
+    required this.surah,
+    required this.ayahs,
+    required this.onNavigateToTafsir,
+    required this.onNavigateToIrab,
+  });
+
+  @override
+  State<_AyahNavigatorTab> createState() => _AyahNavigatorTabState();
+}
+
+class _AyahNavigatorTabState extends State<_AyahNavigatorTab> with AutomaticKeepAliveClientMixin {
+  final TextEditingController _searchController = TextEditingController();
+  List<Ayah> _filtered = [];
+  int? _selectedAyahNum;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.ayahs;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearch(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filtered = widget.ayahs;
+      } else {
+        _filtered = widget.ayahs.where((a) {
+          return a.text.contains(query) || a.numberInSurah.toString() == query;
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    const primary = Color(0xFF059669);
+
+    return Column(
+      children: [
+        // Search bar
+        Container(
+          color: isDark ? const Color(0xFF1C2A36) : Colors.white,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.search, color: primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'جميع آيات سورة ${widget.surah.nameArabic}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: primary),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_filtered.length} آية',
+                      style: const TextStyle(fontSize: 12, color: primary, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _searchController,
+                onChanged: _onSearch,
+                textDirection: TextDirection.rtl,
+                decoration: InputDecoration(
+                  hintText: 'ابحث في نص الآية أو رقمها...',
+                  hintTextDirection: TextDirection.rtl,
+                  prefixIcon: const Icon(Icons.search, color: primary),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () { _searchController.clear(); _onSearch(''); },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF2A3A46) : Colors.grey[100],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: primary, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Ayah list
+        Expanded(
+          child: _filtered.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: Colors.grey.withValues(alpha: 0.5)),
+                      const SizedBox(height: 12),
+                      const Text('لا توجد نتائج', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+                  itemCount: _filtered.length,
+                  itemBuilder: (context, index) {
+                    final ayah = _filtered[index];
+                    final isSelected = _selectedAyahNum == ayah.numberInSurah;
+                    return _buildAyahItem(ayah, theme, isDark, isSelected);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAyahItem(Ayah ayah, ThemeData theme, bool isDark, bool isSelected) {
+    const primary = Color(0xFF059669);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? (isDark ? const Color(0xFF052E16) : const Color(0xFFECFDF5))
+            : (isDark ? const Color(0xFF1C2A36) : Colors.white),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected ? primary : theme.colorScheme.outline.withValues(alpha: 0.08),
+          width: isSelected ? 1.5 : 1,
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6)],
+      ),
+      child: InkWell(
+        onTap: () => setState(() => _selectedAyahNum = isSelected ? null : ayah.numberInSurah),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [primary, Color(0xFF047857)]),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${ayah.numberInSurah}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (ayah.juz > 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('جزء ${ayah.juz}', style: const TextStyle(fontSize: 10, color: Colors.teal)),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  if (ayah.page > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('ص${ayah.page}', style: const TextStyle(fontSize: 10, color: Colors.blue)),
+                    ),
+                  const Spacer(),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                    onSelected: (v) => _handleAction(v, ayah),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'copy', child: Row(children: [Icon(Icons.copy, size: 16, color: primary), SizedBox(width: 8), Text('نسخ')])),
+                      const PopupMenuItem(value: 'share', child: Row(children: [Icon(Icons.share, size: 16, color: Colors.teal), SizedBox(width: 8), Text('مشاركة')])),
+                      const PopupMenuItem(value: 'tafsir', child: Row(children: [Icon(Icons.auto_stories, size: 16, color: Color(0xFF1B5E20)), SizedBox(width: 8), Text('التفسير')])),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                ayah.text,
+                style: TextStyle(
+                  fontSize: 19,
+                  height: 2.1,
+                  color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1A1A1A),
+                ),
+                textAlign: TextAlign.justify,
+                textDirection: TextDirection.rtl,
+              ),
+              if (isSelected) ...[
+                const SizedBox(height: 8),
+                Divider(color: primary.withValues(alpha: 0.2)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildAction(Icons.auto_stories, 'التفسير', primary, widget.onNavigateToTafsir),
+                    _buildAction(Icons.text_fields, 'الإعراب', Colors.purple, widget.onNavigateToIrab),
+                    _buildAction(Icons.copy, 'نسخ', Colors.blue, () => _handleAction('copy', ayah)),
+                    _buildAction(Icons.share, 'مشاركة', Colors.teal, () => _handleAction('share', ayah)),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAction(IconData icon, String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  void _handleAction(String action, Ayah ayah) {
+    final surahName = widget.surah.nameArabic;
+    switch (action) {
+      case 'copy':
+        Clipboard.setData(ClipboardData(text: '${ayah.text}\n(سورة $surahName - الآية ${ayah.numberInSurah})'));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('تم النسخ'),
+            backgroundColor: const Color(0xFF059669),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        break;
+      case 'share':
+        SharePlus.instance.share(ShareParams(text: '${ayah.text}\n(سورة $surahName - الآية ${ayah.numberInSurah})\n\nمن تطبيق نور القرآن'));
+        break;
+      case 'tafsir':
+        widget.onNavigateToTafsir();
+        break;
+    }
   }
 }
