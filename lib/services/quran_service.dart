@@ -6,8 +6,9 @@ class QuranService {
   static const String _tafsirBaseUrl =
       'https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir';
 
-  // Tafsir editions available in Arabic
+  // Tafsir editions available - Arabic and English
   static const List<TafsirEdition> tafsirEditions = [
+    // === التفاسير العربية ===
     TafsirEdition(
       id: 'ar-tafsir-ibn-kathir',
       name: 'تفسير ابن كثير',
@@ -15,6 +16,7 @@ class QuranService {
       description: 'تفسير القرآن العظيم - من أشهر كتب التفسير بالمأثور',
       color: 0xFF1B5E20,
       icon: 'book',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafsir-al-tabari',
@@ -23,6 +25,7 @@ class QuranService {
       description: 'جامع البيان عن تأويل آي القرآن - أعظم كتب التفسير بالمأثور',
       color: 0xFF0D47A1,
       icon: 'history_edu',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafseer-al-qurtubi',
@@ -31,6 +34,7 @@ class QuranService {
       description: 'الجامع لأحكام القرآن - أفضل تفسير فقهي للقرآن',
       color: 0xFF4A148C,
       icon: 'gavel',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafseer-al-saddi',
@@ -39,6 +43,7 @@ class QuranService {
       description: 'تيسير الكريم الرحمن في تفسير كلام المنان',
       color: 0xFFE65100,
       icon: 'auto_stories',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafsir-al-baghawi',
@@ -47,6 +52,7 @@ class QuranService {
       description: 'معالم التنزيل - من أفضل كتب التفسير بالمأثور',
       color: 0xFF880E4F,
       icon: 'menu_book',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafsir-al-wasit',
@@ -55,6 +61,7 @@ class QuranService {
       description: 'التفسير الوسيط للقرآن الكريم',
       color: 0xFF006064,
       icon: 'school',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafsir-muyassar',
@@ -63,6 +70,7 @@ class QuranService {
       description: 'التفسير الميسر - سهل العبارة واضح المعنى',
       color: 0xFF33691E,
       icon: 'lightbulb',
+      language: 'ar',
     ),
     TafsirEdition(
       id: 'ar-tafseer-tanwir-al-miqbas',
@@ -71,22 +79,89 @@ class QuranService {
       description: 'تنوير المقباس من تفسير ابن عباس',
       color: 0xFF3E2723,
       icon: 'wb_sunny',
+      language: 'ar',
     ),
+    // === التفاسير الإنجليزية ===
     TafsirEdition(
       id: 'en-al-jalalayn',
-      name: 'تفسير الجلالين',
+      name: 'تفسير الجلالين (إنجليزي)',
       author: 'جلال الدين المحلي والسيوطي',
-      description: 'تفسير الجلالين - أشهر تفسير مختصر',
+      description: 'Tafsir al-Jalalayn - The most famous concise tafsir, translated to English',
       color: 0xFF263238,
       icon: 'summarize',
+      language: 'en',
     ),
     TafsirEdition(
       id: 'en-tafisr-ibn-kathir',
-      name: 'ابن كثير (مختصر إنجليزي)',
+      name: 'ابن كثير (إنجليزي)',
       author: 'الحافظ ابن كثير',
-      description: 'مختصر تفسير ابن كثير باللغة الإنجليزية',
+      description: 'Abridged Tafsir Ibn Kathir - English translation of the renowned tafsir',
       color: 0xFF1A237E,
       icon: 'translate',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-tafsir-ibn-abbas',
+      name: 'تفسير ابن عباس (إنجليزي)',
+      author: 'عبدالله بن عباس',
+      description: 'Tafsir Ibn Abbas - English translation attributed to the great companion',
+      color: 0xFF4E342E,
+      icon: 'person',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-al-qushairi-tafsir',
+      name: 'تفسير القشيري (إنجليزي)',
+      author: 'الإمام القشيري',
+      description: 'Lataif al-Isharat - Qushayri\'s mystical Quran commentary in English',
+      color: 0xFF5D4037,
+      icon: 'self_improvement',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-kashani-tafsir',
+      name: 'تفسير الكاشاني (إنجليزي)',
+      author: 'عبدالرزاق الكاشاني',
+      description: 'Kashani\'s Tafsir - Spiritual and mystical Quran interpretation in English',
+      color: 0xFF37474F,
+      icon: 'spa',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-tafsir-al-tustari',
+      name: 'تفسير التستري (إنجليزي)',
+      author: 'سهل بن عبدالله التستري',
+      description: 'Tafsir al-Tustari - One of the earliest Sufi commentaries, translated to English',
+      color: 0xFF455A64,
+      icon: 'psychology',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-kashf-al-asrar-tafsir',
+      name: 'كشف الأسرار (إنجليزي)',
+      author: 'الميبدي',
+      description: 'Kashf al-Asrar - Unveiling the Secrets, a comprehensive Persian tafsir in English',
+      color: 0xFF795548,
+      icon: 'visibility',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-asbab-al-nuzul-by-al-wahidi',
+      name: 'أسباب النزول (إنجليزي)',
+      author: 'الإمام الواحدي',
+      description: 'Asbab al-Nuzul - Occasions of revelation by al-Wahidi, essential companion text',
+      color: 0xFF6D4C41,
+      icon: 'history',
+      language: 'en',
+    ),
+    TafsirEdition(
+      id: 'en-tafsir-maarif-ul-quran',
+      name: 'معارف القرآن (إنجليزي)',
+      author: 'المفتي محمد شفيع',
+      description: 'Ma\'ariful Quran - Comprehensive modern tafsir by Mufti Muhammad Shafi in English',
+      color: 0xFF546E7A,
+      icon: 'menu_book',
+      language: 'en',
     ),
   ];
 
@@ -194,6 +269,7 @@ class TafsirEdition {
   final String description;
   final int color;
   final String icon;
+  final String language;
 
   const TafsirEdition({
     required this.id,
@@ -202,7 +278,11 @@ class TafsirEdition {
     required this.description,
     required this.color,
     required this.icon,
+    this.language = 'ar',
   });
+
+  bool get isArabic => language == 'ar';
+  bool get isEnglish => language == 'en';
 }
 
 class Ayah {

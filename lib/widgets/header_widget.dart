@@ -181,7 +181,7 @@ class HeaderWidget extends StatelessWidget {
                       _buildStat('${surahs.length}', isAr ? 'سورة' : 'Surahs', Icons.bookmark_outlined),
                       _buildStat('$totalVerses', isAr ? 'آية' : 'Verses', Icons.format_quote_rounded),
                       _buildStat('30', isAr ? 'جزء' : 'Juz', Icons.layers_outlined),
-                      _buildStat('10', isAr ? 'تفسير' : 'Tafsirs', Icons.auto_stories_outlined),
+                      _buildStat('18', isAr ? 'تفسير' : 'Tafsirs', Icons.auto_stories_outlined),
                     ],
                   ),
                   const SizedBox(height: 12),

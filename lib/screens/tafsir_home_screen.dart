@@ -85,7 +85,7 @@ class _TafsirHomeScreenState extends State<TafsirHomeScreen> {
                           ),
                         ),
                         Text(
-                          '10 تفاسير من أمهات كتب التفسير عند أهل السنة',
+                          '${QuranService.tafsirEditions.length} تفسيرًا - عربي وإنجليزي',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 13,
@@ -440,6 +440,18 @@ class _TafsirHomeScreenState extends State<TafsirHomeScreen> {
         return Icons.summarize;
       case 'translate':
         return Icons.translate;
+      case 'person':
+        return Icons.person;
+      case 'self_improvement':
+        return Icons.self_improvement;
+      case 'spa':
+        return Icons.spa;
+      case 'psychology':
+        return Icons.psychology;
+      case 'visibility':
+        return Icons.visibility;
+      case 'history':
+        return Icons.history;
       default:
         return Icons.book;
     }

@@ -261,7 +261,7 @@ class _FeatureCards extends StatelessWidget {
               child: _FeatureCard(
                 icon: Icons.auto_stories,
                 title: isAr ? 'التفاسير' : 'Tafsir',
-                subtitle: isAr ? '10 تفاسير معتمدة' : '10 Tafsir Books',
+                subtitle: isAr ? '18 تفسيرًا معتمدًا' : '18 Tafsir Books',
                 gradient: const [Color(0xFF1B5E20), Color(0xFF388E3C)],
                 onTap: () {
                   Navigator.push(
