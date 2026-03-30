@@ -20,6 +20,8 @@ class _MushafScreenState extends State<MushafScreen>
   bool _showOverlay = false;
 
 
+  int _bookmarkedPage = 0;
+
   // Cache for page data
   final Map<int, List<MushafAyah>> _pageCache = {};
   final Map<int, bool> _loadingPages = {};
@@ -37,6 +39,7 @@ class _MushafScreenState extends State<MushafScreen>
     super.initState();
     _currentPage = widget.initialPage.clamp(1, totalPages);
     _pageController = PageController(initialPage: _currentPage - 1);
+    _loadBookmark();
     _loadPageData(_currentPage);
     // Preload adjacent pages
     if (_currentPage > 1) _loadPageData(_currentPage - 1);
@@ -47,6 +50,31 @@ class _MushafScreenState extends State<MushafScreen>
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBookmark() async {
+    final lastPage = await BookmarkService.getLastPage();
+    if (mounted) setState(() => _bookmarkedPage = lastPage);
+  }
+
+  void _toggleBookmark() {
+    setState(() => _bookmarkedPage = _currentPage);
+    BookmarkService.saveLastPage(_currentPage);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.bookmark_added, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text('تم حفظ العلامة عند الصفحة $_currentPage'),
+          ],
+        ),
+        backgroundColor: const Color(0xFFD4A843),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _loadPageData(int pageNumber) async {
@@ -193,6 +221,14 @@ class _MushafScreenState extends State<MushafScreen>
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(
+                  _currentPage == _bookmarkedPage ? Icons.bookmark : Icons.bookmark_border,
+                  color: _gold,
+                ),
+                onPressed: _toggleBookmark,
+                tooltip: 'حفظ علامة مرجعية',
               ),
               IconButton(
                 icon: const Icon(Icons.search, color: Colors.white),
